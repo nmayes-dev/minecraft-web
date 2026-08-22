@@ -4,15 +4,18 @@
 
 <PageTitle>Console</PageTitle>
 
-<h1>Console</h1>
-<p>Commands are sent through Minecraft RCON.</p>
+<div class="app-page">
+    <h1>Console</h1>
+    <p>Commands are sent through Minecraft RCON.</p>
 
-<div class="console-form">
-    <input @bind="command_" @bind:event="oninput" @onkeydown="OnKeyDown" placeholder="list" />
-    <button @onclick="SendAsync" disabled="@sending_">Send</button>
+    <div class="console-form">
+        <input @bind="command_" @bind:event="oninput" @onkeydown="OnKeyDown" placeholder="list" />
+        <button @onclick="SendAsync" disabled="@sending_">Send</button>
+    </div>
+
+    <pre class="console-output">@string.Join(Environment.NewLine + Environment.NewLine, history_)</pre>
 </div>
 
-<pre class="console-output">@string.Join(Environment.NewLine + Environment.NewLine, history_)</pre>
 
 @code {
     private string command_ = string.Empty;

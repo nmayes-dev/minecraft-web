@@ -4,179 +4,188 @@
 
 <PageTitle>Configuration</PageTitle>
 
-<h1>Configuration</h1>
+<div class="app-page">
 
-@if (loadingFiles_)
-{
-    <p>Loading configuration files…</p>
-}
-else if (!string.IsNullOrWhiteSpace(error_))
-{
-    <p class="error">@error_</p>
-}
-else
-{
-    <div class="config-layout">
-        <aside class="config-browser panel">
-            <div class="config-browser-header">
-                <strong>Configuration Files</strong>
-                <button type="button"
-                        class="icon-button"
-                        title="Refresh configuration files"
-                        aria-label="Refresh configuration files"
-                        @onclick="RefreshAsync"
-                        disabled="@loadingDocument_">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M20 6v5h-5M4 18v-5h5M18.4 9A7 7 0 0 0 6.2 6.2L4 8m16 8-2.2 1.8A7 7 0 0 1 5.6 15" />
-                    </svg>
-                </button>
-            </div>
+    <h1>Configuration</h1>
 
-            <div class="config-search">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="m16 16 5 5" />
-                </svg>
-                <input type="search"
-                       value="@searchText_"
-                       @oninput="OnSearchChanged"
-                       placeholder="Search configs or fields…"
-                       aria-label="Search configuration files" />
-                @if (!string.IsNullOrWhiteSpace(searchText_))
-                {
+    @if (loadingFiles_)
+    {
+        <p>Loading configuration files…</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(error_))
+    {
+        <p class="error">@error_</p>
+    }
+    else
+    {
+        <div class="config-layout">
+            <aside class="config-browser panel">
+                <div class="config-browser-header">
+                    <strong>Configuration Files</strong>
                     <button type="button"
-                            class="config-search-clear"
-                            title="Clear search"
-                            aria-label="Clear search"
-                            @onclick="ClearSearch">×</button>
-                }
-            </div>
-
-            @foreach (var group in VisibleGroups)
-            {
-                <div class="config-group">
-                    <button type="button"
-                            class="config-group-title"
-                            aria-expanded="@(!IsCollapsed(group.Key))"
-                            @onclick="() => ToggleGroup(group.Key)">
-                        <span class="config-group-chevron @(ShouldShowGroupContents(group.Key) ? "expanded" : null)">▶</span>
-                        <span>@group.Key</span>
-                        <span class="config-group-count">@group.Count()</span>
+                            class="icon-button"
+                            title="Refresh configuration files"
+                            aria-label="Refresh configuration files"
+                            @onclick="RefreshAsync"
+                            disabled="@loadingDocument_">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20 6v5h-5M4 18v-5h5M18.4 9A7 7 0 0 0 6.2 6.2L4 8m16 8-2.2 1.8A7 7 0 0 1 5.6 15" />
+                        </svg>
                     </button>
+                </div>
 
-                    @if (ShouldShowGroupContents(group.Key))
+                <div class="config-search">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="m16 16 5 5" />
+                    </svg>
+                    <input type="search"
+                           value="@searchText_"
+                           @oninput="OnSearchChanged"
+                           placeholder="Search configs or fields…"
+                           aria-label="Search configuration files" />
+                    @if (!string.IsNullOrWhiteSpace(searchText_))
                     {
-                        <div class="config-group-files">
-                            @foreach (var file in group)
+                        <button type="button"
+                                class="config-search-clear"
+                                title="Clear search"
+                                aria-label="Clear search"
+                                @onclick="ClearSearch">
+                            ×
+                        </button>
+                    }
+                </div>
+
+                <div class="config-list">
+                    @foreach (var group in VisibleGroups)
+                    {
+                        <div class="config-group">
+                            <button type="button"
+                                    class="config-group-title"
+                                    aria-expanded="@(!IsCollapsed(group.Key))"
+                                    @onclick="() => ToggleGroup(group.Key)">
+                                <span class="config-group-chevron @(ShouldShowGroupContents(group.Key) ? "expanded" : null)">▶</span>
+                                <span>@group.Key</span>
+                                <span class="config-group-count">@group.Count()</span>
+                            </button>
+
+                            @if (ShouldShowGroupContents(group.Key))
                             {
-                                <button type="button"
-                                        class="config-file @(document_?.Path == file.Path ? "selected" : null)"
-                                        title="@file.Path"
-                                        @onclick="() => OpenAsync(file.Path)">
-                                    <span>@file.Name</span>
-                                    <small>@GetDisplayPath(file)</small>
-                                </button>
+                                <div class="config-group-files">
+                                    @foreach (var file in group)
+                                    {
+                                        <button type="button"
+                                                class="config-file @(document_?.Path == file.Path ? "selected" : null)"
+                                                title="@file.Path"
+                                                @onclick="() => OpenAsync(file.Path)">
+                                            <span>@file.Name</span>
+                                            <small>@GetDisplayPath(file)</small>
+                                        </button>
+                                    }
+                                </div>
                             }
                         </div>
                     }
-                </div>
-            }
 
-            @if (files_.Count == 0)
-            {
-                <p class="muted">No supported configuration files were found.</p>
-            }
-            else if (!FilteredFiles.Any())
-            {
-                <p class="muted config-search-empty">No configuration files match your search.</p>
-            }
-        </aside>
-
-        <section class="config-editor panel">
-            @if (loadingDocument_)
-            {
-                <p>Loading configuration…</p>
-            }
-            else if (document_ is null)
-            {
-                <div class="config-empty">
-                    <h2>Select a configuration file</h2>
-                    <p>Choose a file from the navigator to edit its supported values.</p>
-                </div>
-            }
-            else
-            {
-                <div class="config-editor-header">
-                    <div>
-                        <h2>@document_.Name</h2>
-                        <div class="config-path">@document_.Path · @document_.Format</div>
-                    </div>
-                    <button type="button" @onclick="SaveAsync" disabled="@saving_">@(saving_ ? "Saving…" : "Save")</button>
+                    @if (files_.Count == 0)
+                    {
+                        <p class="muted">No supported configuration files were found.</p>
+                    }
+                    else if (!FilteredFiles.Any())
+                    {
+                        <p class="muted config-search-empty">No configuration files match your search.</p>
+                    }
                 </div>
 
-                @if (document_.Fields.Count == 0)
+            </aside>
+
+            <section class="config-editor panel">
+                @if (loadingDocument_)
                 {
-                    <p class="muted">This file does not contain any scalar values that the dynamic editor currently supports.</p>
+                    <p>Loading configuration…</p>
+                }
+                else if (document_ is null)
+                {
+                    <div class="config-empty">
+                        <h2>Select a configuration file</h2>
+                        <p>Choose a file from the navigator to edit its supported values.</p>
+                    </div>
                 }
                 else
                 {
-                    @foreach (var section in document_.Fields.GroupBy(x => x.Section ?? string.Empty))
-                    {
-                        <div class="config-section">
-                            @if (!string.IsNullOrWhiteSpace(section.Key))
-                            {
-                                <h3>@section.Key</h3>
-                            }
+                    <div class="config-editor-header">
+                        <div>
+                            <h2>@document_.Name</h2>
+                            <div class="config-path">@document_.Path · @document_.Format</div>
+                        </div>
+                        <button type="button" @onclick="SaveAsync" disabled="@saving_">@(saving_ ? "Saving…" : "Save")</button>
+                    </div>
 
-                            <div class="config-fields">
-                                @foreach (var field in section)
+                    @if (document_.Fields.Count == 0)
+                    {
+                        <p class="muted">This file does not contain any scalar values that the dynamic editor currently supports.</p>
+                    }
+                    else
+                    {
+                        @foreach (var section in document_.Fields.GroupBy(x => x.Section ?? string.Empty))
+                        {
+                            <div class="config-section">
+                                @if (!string.IsNullOrWhiteSpace(section.Key))
                                 {
-                                    <div class="config-field">
-                                        <div class="config-field-label">
-                                            <label for="@FieldElementId(field)">@field.Key</label>
-                                            @if (!string.IsNullOrWhiteSpace(field.Description))
+                                    <h3>@section.Key</h3>
+                                }
+
+                                <div class="config-fields">
+                                    @foreach (var field in section)
+                                    {
+                                        <div class="config-field">
+                                            <div class="config-field-label">
+                                                <label for="@FieldElementId(field)">@field.Key</label>
+                                                @if (!string.IsNullOrWhiteSpace(field.Description))
+                                                {
+                                                    <small>@field.Description</small>
+                                                }
+                                            </div>
+
+                                            @if (field.Kind == ConfigValueKind.Boolean)
                                             {
-                                                <small>@field.Description</small>
+                                                <label class="config-switch">
+                                                    <input id="@FieldElementId(field)"
+                                                           type="checkbox"
+                                                           checked="@IsChecked(field)"
+                                                           @onchange="e => SetBoolean(field, e.Value)" />
+                                                    <span>@(IsChecked(field) ? "Enabled" : "Disabled")</span>
+                                                </label>
+                                            }
+                                            else if (field.Kind == ConfigValueKind.Integer)
+                                            {
+                                                <input id="@FieldElementId(field)" type="number" step="1" @bind="field.Value" />
+                                            }
+                                            else if (field.Kind == ConfigValueKind.Decimal)
+                                            {
+                                                <input id="@FieldElementId(field)" type="number" step="any" @bind="field.Value" />
+                                            }
+                                            else
+                                            {
+                                                <input id="@FieldElementId(field)" type="text" @bind="field.Value" />
                                             }
                                         </div>
-
-                                        @if (field.Kind == ConfigValueKind.Boolean)
-                                        {
-                                            <label class="config-switch">
-                                                <input id="@FieldElementId(field)"
-                                                       type="checkbox"
-                                                       checked="@IsChecked(field)"
-                                                       @onchange="e => SetBoolean(field, e.Value)" />
-                                                <span>@(IsChecked(field) ? "Enabled" : "Disabled")</span>
-                                            </label>
-                                        }
-                                        else if (field.Kind == ConfigValueKind.Integer)
-                                        {
-                                            <input id="@FieldElementId(field)" type="number" step="1" @bind="field.Value" />
-                                        }
-                                        else if (field.Kind == ConfigValueKind.Decimal)
-                                        {
-                                            <input id="@FieldElementId(field)" type="number" step="any" @bind="field.Value" />
-                                        }
-                                        else
-                                        {
-                                            <input id="@FieldElementId(field)" type="text" @bind="field.Value" />
-                                        }
-                                    </div>
-                                }
+                                    }
+                                </div>
                             </div>
-                        </div>
+                        }
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(message_))
+                    {
+                        <p class="@(saveFailed_ ? "error" : "success")">@message_</p>
                     }
                 }
+            </section>
+        </div>
+    }
+</div>
 
-                @if (!string.IsNullOrWhiteSpace(message_))
-                {
-                    <p class="@(saveFailed_ ? "error" : "success")">@message_</p>
-                }
-            }
-        </section>
-    </div>
-}
 
 @code {
     private IReadOnlyList<ConfigFileInfo> files_ = [];

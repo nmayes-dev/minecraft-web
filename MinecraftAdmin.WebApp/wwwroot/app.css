@@ -12,6 +12,15 @@ body {
     margin: 0;
     background: #101419;
     color: #e9eef4;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
 }
 
 button, input, select {
@@ -19,7 +28,8 @@ button, input, select {
 }
 
 .page-shell {
-    min-height: 100vh;
+    height: 100dvh;
+    min-height: 0;
     display: grid;
     grid-template-columns: 220px 1fr;
 }
@@ -54,9 +64,22 @@ button, input, select {
         }
 
 .content {
-    padding: 0 2rem;
-    max-width: 1100px;
+    padding: 0 1rem;
     width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: clip;
+    container-type: inline-size;
+}
+
+.app-page {
+    display: grid;
+    grid-auto-rows: min-content;
+    padding: clamp(0.25rem, 0.65vw, 0.8rem);
+    width: 100%;
+    height: 100%;
+    overflow: clip;
+    container-type: inline-size;
 }
 
 .card-grid {
@@ -246,9 +269,15 @@ button {
 .config-browser, .config-editor {
     margin: 0;
     height: calc(100vh - 7rem);
+    min-height: 0;
     overflow-y: scroll;
     position: sticky;
     top: 1rem;
+}
+
+.config-browser {
+    display: grid;
+    grid-template-rows: min-content min-content minmax(0, 1fr);
 }
 
 .config-browser-header, .config-editor-header {
