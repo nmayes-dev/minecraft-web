@@ -1,10 +1,10 @@
-@namespace MinecraftAdmin.WebApp.Components
+@namespace MinecraftAdmin.WebApp.Components.Layout
 
 @foreach (var node in Nodes)
 {
     if (node.IsDirectory)
     {
-        var expanded = SearchActive || !CollapsedFolders.Contains(node.Key);
+        var expanded = SearchActive || OpenFolders.Contains(node.Key);
         <div class="tree-directory">
             <button type="button"
                     class="tree-directory-title"
@@ -21,7 +21,7 @@
                     <ConfigTree Nodes="node.Children"
                                 SelectedPath="SelectedPath"
                                 OnFileSelected="OnFileSelected"
-                                CollapsedFolders="CollapsedFolders"
+                                OpenFolders="OpenFolders"
                                 SearchActive="SearchActive" />
                 </div>
             }
@@ -50,15 +50,15 @@
     public EventCallback<string> OnFileSelected { get; set; }
 
     [Parameter, EditorRequired]
-    public HashSet<string> CollapsedFolders { get; set; } = [];
+    public HashSet<string> OpenFolders { get; set; } = [];
 
     [Parameter]
     public bool SearchActive { get; set; }
 
     private void ToggleDirectory(string key)
     {
-        if (!CollapsedFolders.Add(key))
-            CollapsedFolders.Remove(key);
+        if (!OpenFolders.Add(key))
+            OpenFolders.Remove(key);
     }
 
     private static int CountFiles(ConfigTreeNode node) => node.IsDirectory
