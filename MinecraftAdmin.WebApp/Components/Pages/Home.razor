@@ -1,0 +1,97 @@
+@page "/"
+@rendermode InteractiveServer
+@inject MinecraftService Minecraft
+
+<PageTitle>Minecraft Admin</PageTitle>
+
+<h1>Server</h1>
+
+@if (loading_)
+{
+    <p>Loading…</p>
+}
+else if (status_ is null)
+{
+    <p>Unable to load server status.</p>
+}
+else
+{
+    <section class="card-grid">
+        <article class="card">
+            <div class="label">Status</div>
+            <div class="value">@(status_.Online ? "Online" : "Offline")</div>
+        </article>
+        <article class="card">
+            <div class="label">Players</div>
+            <div class="value">@status_.PlayerCount</div>
+        </article>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(status_.Error))
+    {
+        <div class="error">@status_.Error</div>
+    }
+
+    <section class="panel">
+        <h2>Players</h2>
+        @if (status_.Players.Count == 0)
+        {
+            <p>No players online.</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var player in status_.Players)
+                {
+                    <li>@player</li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+<div class="actions">
+    <button @onclick="RefreshAsync" disabled="@loading_">Refresh</button>
+    <button class="danger" @onclick="RestartAsync" disabled="@(!CanRestart)">Restart server</button>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(message_))
+{
+    <p>@message_</p>
+}
+
+@code {
+    private MinecraftStatus? status_;
+    private bool loading_ = true;
+    private bool restarting_;
+    private string? message_;
+    private bool CanRestart => status_?.Online == true && !restarting_;
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        loading_ = true;
+        message_ = null;
+        status_ = await Minecraft.GetStatusAsync();
+        loading_ = false;
+    }
+
+    private async Task RestartAsync()
+    {
+        restarting_ = true;
+        try
+        {
+            await Minecraft.RestartAsync();
+            message_ = "Restart command sent. Docker should start Minecraft again automatically.";
+        }
+        catch (Exception ex)
+        {
+            message_ = ex.Message;
+        }
+        finally
+        {
+            restarting_ = false;
+        }
+    }
+}

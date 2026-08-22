@@ -1,0 +1,97 @@
+@page "/config"
+@rendermode InteractiveServer
+@inject ServerPropertiesService Properties
+
+<PageTitle>Configuration</PageTitle>
+
+<h1>Server configuration</h1>
+
+@if (settings_ is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <EditForm Model="settings_" OnValidSubmit="SaveAsync" FormName="server-settings">
+        <div class="form-grid">
+            <label>
+                MOTD
+                <InputText @bind-Value="settings_.Motd" />
+            </label>
+
+            <label>
+                Difficulty
+                <InputSelect @bind-Value="settings_.Difficulty">
+                    <option value="peaceful">Peaceful</option>
+                    <option value="easy">Easy</option>
+                    <option value="normal">Normal</option>
+                    <option value="hard">Hard</option>
+                </InputSelect>
+            </label>
+
+            <label>
+                Max players
+                <InputNumber @bind-Value="settings_.MaxPlayers" />
+            </label>
+
+            <label>
+                View distance
+                <InputNumber @bind-Value="settings_.ViewDistance" />
+            </label>
+
+            <label>
+                Simulation distance
+                <InputNumber @bind-Value="settings_.SimulationDistance" />
+            </label>
+
+            <label class="check-row">
+                <InputCheckbox @bind-Value="settings_.WhiteList" />
+                Whitelist enabled
+            </label>
+
+            <label class="check-row">
+                <InputCheckbox @bind-Value="settings_.OnlineMode" />
+                Online mode
+            </label>
+        </div>
+
+        <div class="actions">
+            <button type="submit" disabled="@saving_">Save</button>
+        </div>
+    </EditForm>
+}
+
+@if (!string.IsNullOrWhiteSpace(message_))
+{
+    <p>@message_</p>
+}
+
+@code {
+    private ServerSettings? settings_;
+    private bool saving_;
+    private string? message_;
+
+    protected override async Task OnInitializedAsync() => settings_ = await Properties.GetAsync();
+
+    private async Task SaveAsync()
+    {
+        if (settings_ is null)
+            return;
+
+        saving_ = true;
+        message_ = null;
+        try
+        {
+            await Properties.UpdateAsync(settings_);
+            message_ = "Saved. Restart Minecraft for settings that are only read at startup.";
+        }
+        catch (Exception ex)
+        {
+            message_ = ex.Message;
+        }
+        finally
+        {
+            saving_ = false;
+        }
+    }
+}

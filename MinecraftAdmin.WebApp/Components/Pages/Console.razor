@@ -1,0 +1,53 @@
+@page "/console"
+@rendermode InteractiveServer
+@inject MinecraftService Minecraft
+
+<PageTitle>Console</PageTitle>
+
+<h1>Console</h1>
+<p>Commands are sent through Minecraft RCON.</p>
+
+<div class="console-form">
+    <input @bind="command_" @bind:event="oninput" @onkeydown="OnKeyDown" placeholder="list" />
+    <button @onclick="SendAsync" disabled="@sending_">Send</button>
+</div>
+
+@if (history_.Count > 0)
+{
+    <pre class="console-output">@string.Join(Environment.NewLine + Environment.NewLine, history_)</pre>
+}
+
+@code {
+    private string command_ = string.Empty;
+    private bool sending_;
+    private readonly List<string> history_ = [];
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SendAsync();
+    }
+
+    private async Task SendAsync()
+    {
+        var command = command_.Trim();
+        if (command.Length == 0 || sending_)
+            return;
+
+        sending_ = true;
+        command_ = string.Empty;
+        try
+        {
+            var response = await Minecraft.ExecuteCommandAsync(command);
+            history_.Insert(0, $"> {command}\n{response}");
+        }
+        catch (Exception ex)
+        {
+            history_.Insert(0, $"> {command}\nERROR: {ex.Message}");
+        }
+        finally
+        {
+            sending_ = false;
+        }
+    }
+}

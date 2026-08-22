@@ -1,0 +1,42 @@
+:root {
+    font-family: Inter, system-ui, sans-serif;
+    color: #e9eef4;
+    background: #101419;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: #101419; color: #e9eef4; }
+button, input, select { font: inherit; }
+
+.page-shell { min-height: 100vh; display: grid; grid-template-columns: 220px 1fr; }
+.sidebar { background: #171d24; padding: 1.25rem; border-right: 1px solid #2b343e; }
+.brand { font-weight: 700; font-size: 1.15rem; margin-bottom: 1.5rem; }
+.nav-menu { display: grid; gap: .4rem; }
+.nav-menu a { color: #bfc9d4; text-decoration: none; padding: .65rem .75rem; border-radius: .45rem; }
+.nav-menu a.active, .nav-menu a:hover { background: #242e38; color: white; }
+.content { padding: 2rem; max-width: 1100px; width: 100%; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+.card, .panel { background: #171d24; border: 1px solid #2b343e; border-radius: .7rem; padding: 1.1rem; }
+.panel { margin: 1rem 0; }
+.label { color: #9ca9b6; font-size: .9rem; }
+.value { font-size: 1.8rem; font-weight: 700; margin-top: .25rem; }
+.actions { display: flex; gap: .75rem; margin-top: 1rem; }
+button { border: 1px solid #3b4856; background: #25313c; color: white; border-radius: .45rem; padding: .55rem .9rem; cursor: pointer; }
+button:hover:not(:disabled) { background: #303e4a; }
+button:disabled { opacity: .5; cursor: default; }
+button.danger { border-color: #744; background: #4a2528; }
+.error { color: #ffb4b4; }
+.form-grid { display: grid; gap: 1rem; max-width: 620px; }
+.form-grid label { display: grid; gap: .35rem; color: #c7d0d9; }
+.form-grid input, .form-grid select, .console-form input { background: #11161b; border: 1px solid #3a4652; color: white; border-radius: .4rem; padding: .55rem .65rem; }
+.check-row { display: flex !important; align-items: center; gap: .6rem !important; }
+.console-form { display: flex; gap: .75rem; max-width: 800px; }
+.console-form input { flex: 1; }
+.console-output { margin-top: 1rem; padding: 1rem; min-height: 300px; overflow: auto; background: #090c0f; border: 1px solid #2b343e; border-radius: .5rem; white-space: pre-wrap; }
+
+@media (max-width: 720px) {
+    .page-shell { grid-template-columns: 1fr; }
+    .sidebar { border-right: 0; border-bottom: 1px solid #2b343e; }
+    .nav-menu { display: flex; flex-wrap: wrap; }
+    .content { padding: 1.25rem; }
+}
