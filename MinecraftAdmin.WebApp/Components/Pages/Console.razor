@@ -12,10 +12,7 @@
     <button @onclick="SendAsync" disabled="@sending_">Send</button>
 </div>
 
-@if (history_.Count > 0)
-{
-    <pre class="console-output">@string.Join(Environment.NewLine + Environment.NewLine, history_)</pre>
-}
+<pre class="console-output">@string.Join(Environment.NewLine + Environment.NewLine, history_)</pre>
 
 @code {
     private string command_ = string.Empty;

@@ -17,19 +17,55 @@ public sealed partial class ConfigurationService(IOptions<MinecraftOptions> opti
         ".properties", ".cfg", ".conf", ".toml", ".json", ".json5"
     };
 
-    public Task<IReadOnlyList<ConfigFileInfo>> GetFilesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ConfigFileInfo>> GetFilesAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
         var files = new List<ConfigFileInfo>();
-        AddFile(files, Path.Combine(dataPath_, "server.properties"), "Server");
-        AddDirectory(files, Path.Combine(dataPath_, "config"), "Mod Configs", ct);
+        AddFile(files, Path.Combine(dataPath_, "server.properties"), "Server Files");
         AddDirectory(files, Path.Combine(dataPath_, "defaultconfigs"), "Default Configs", ct);
+        AddDirectory(files, Path.Combine(dataPath_, "config"), "Mod Configs", ct);
 
-        return Task.FromResult<IReadOnlyList<ConfigFileInfo>>(files
-            .OrderBy(x => x.Group)
+        var orderedFiles = files
+            .OrderBy(x => GetGroupOrder(x.Group))
             .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
-            .ToList());
+            .ToList();
+
+        foreach (var file in orderedFiles)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                var document = await GetAsync(file.Path, ct);
+                file.SearchText = BuildSearchText(file, document);
+            }
+            catch
+            {
+                // A malformed/temporarily unavailable config should still appear in the navigator.
+                file.SearchText = $"{file.Name} {file.Path}";
+            }
+        }
+
+        return orderedFiles;
+    }
+
+    private static int GetGroupOrder(string group) => group switch
+    {
+        "Server Files" => 0,
+        "Default Configs" => 1,
+        "Mod Configs" => 2,
+        _ => int.MaxValue
+    };
+
+    private static string BuildSearchText(ConfigFileInfo file, ConfigDocument document)
+    {
+        var keys = document.Fields.Select(field => field.Key);
+        var sections = document.Fields
+            .Select(field => field.Section)
+            .Where(section => !string.IsNullOrWhiteSpace(section));
+
+        return string.Join(' ', new[] { file.Name, file.Path }.Concat(keys).Concat(sections!));
     }
 
     public async Task<ConfigDocument> GetAsync(string relativePath, CancellationToken ct = default)

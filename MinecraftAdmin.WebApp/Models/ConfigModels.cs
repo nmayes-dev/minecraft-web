@@ -14,6 +14,7 @@ public sealed class ConfigFileInfo
     public required string Name { get; init; }
     public required string Group { get; init; }
     public required string Format { get; init; }
+    public string SearchText { get; set; } = string.Empty;
 }
 
 public sealed class ConfigField

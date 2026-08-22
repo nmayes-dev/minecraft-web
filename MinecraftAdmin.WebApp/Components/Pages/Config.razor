@@ -19,23 +19,65 @@ else
     <div class="config-layout">
         <aside class="config-browser panel">
             <div class="config-browser-header">
-                <strong>Configuration files</strong>
-                <button type="button" @onclick="RefreshAsync" disabled="@loadingDocument_">Refresh</button>
+                <strong>Configuration Files</strong>
+                <button type="button"
+                        class="icon-button"
+                        title="Refresh configuration files"
+                        aria-label="Refresh configuration files"
+                        @onclick="RefreshAsync"
+                        disabled="@loadingDocument_">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M20 6v5h-5M4 18v-5h5M18.4 9A7 7 0 0 0 6.2 6.2L4 8m16 8-2.2 1.8A7 7 0 0 1 5.6 15" />
+                    </svg>
+                </button>
             </div>
 
-            @foreach (var group in files_.GroupBy(x => x.Group))
+            <div class="config-search">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m16 16 5 5" />
+                </svg>
+                <input type="search"
+                       value="@searchText_"
+                       @oninput="OnSearchChanged"
+                       placeholder="Search configs or fields…"
+                       aria-label="Search configuration files" />
+                @if (!string.IsNullOrWhiteSpace(searchText_))
+                {
+                    <button type="button"
+                            class="config-search-clear"
+                            title="Clear search"
+                            aria-label="Clear search"
+                            @onclick="ClearSearch">×</button>
+                }
+            </div>
+
+            @foreach (var group in VisibleGroups)
             {
                 <div class="config-group">
-                    <div class="config-group-title">@group.Key</div>
-                    @foreach (var file in group)
+                    <button type="button"
+                            class="config-group-title"
+                            aria-expanded="@(!IsCollapsed(group.Key))"
+                            @onclick="() => ToggleGroup(group.Key)">
+                        <span class="config-group-chevron @(ShouldShowGroupContents(group.Key) ? "expanded" : null)">▶</span>
+                        <span>@group.Key</span>
+                        <span class="config-group-count">@group.Count()</span>
+                    </button>
+
+                    @if (ShouldShowGroupContents(group.Key))
                     {
-                        <button type="button"
-                                class="config-file @(document_?.Path == file.Path ? "selected" : null)"
-                                title="@file.Path"
-                                @onclick="() => OpenAsync(file.Path)">
-                            <span>@file.Name</span>
-                            <small>@GetDisplayPath(file)</small>
-                        </button>
+                        <div class="config-group-files">
+                            @foreach (var file in group)
+                            {
+                                <button type="button"
+                                        class="config-file @(document_?.Path == file.Path ? "selected" : null)"
+                                        title="@file.Path"
+                                        @onclick="() => OpenAsync(file.Path)">
+                                    <span>@file.Name</span>
+                                    <small>@GetDisplayPath(file)</small>
+                                </button>
+                            }
+                        </div>
                     }
                 </div>
             }
@@ -43,6 +85,10 @@ else
             @if (files_.Count == 0)
             {
                 <p class="muted">No supported configuration files were found.</p>
+            }
+            else if (!FilteredFiles.Any())
+            {
+                <p class="muted config-search-empty">No configuration files match your search.</p>
             }
         </aside>
 
@@ -134,13 +180,38 @@ else
 
 @code {
     private IReadOnlyList<ConfigFileInfo> files_ = [];
+    private readonly Dictionary<string, bool> collapsedGroups_ = new(StringComparer.Ordinal);
     private ConfigDocument? document_;
     private bool loadingFiles_ = true;
     private bool loadingDocument_;
     private bool saving_;
     private bool saveFailed_;
+    private string searchText_ = string.Empty;
     private string? error_;
     private string? message_;
+
+    private IEnumerable<ConfigFileInfo> FilteredFiles
+    {
+        get
+        {
+            var terms = searchText_
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (terms.Length == 0)
+                return files_;
+
+            return files_.Where(file =>
+            {
+                var searchable = string.IsNullOrWhiteSpace(file.SearchText)
+                    ? $"{file.Name} {file.Path}"
+                    : file.SearchText;
+
+                return terms.All(term => searchable.Contains(term, StringComparison.OrdinalIgnoreCase));
+            });
+        }
+    }
+
+    private IEnumerable<IGrouping<string, ConfigFileInfo>> VisibleGroups => FilteredFiles.GroupBy(file => file.Group);
 
     protected override async Task OnInitializedAsync() => await RefreshAsync();
 
@@ -201,7 +272,7 @@ else
         {
             await Configuration.UpdateAsync(document_.Path, document_.Fields);
             document_ = await Configuration.GetAsync(document_.Path);
-            message_ = "Saved. Some configuration changes require a Minecraft restart before they take effect.";
+            message_ = "Saved. Some configuration changes require a server restart before they take effect.";
         }
         catch (Exception ex)
         {
@@ -213,6 +284,21 @@ else
             saving_ = false;
         }
     }
+
+    private void OnSearchChanged(ChangeEventArgs args) => searchText_ = args.Value?.ToString() ?? string.Empty;
+
+    private void ClearSearch() => searchText_ = string.Empty;
+
+    private void ToggleGroup(string group)
+    {
+        collapsedGroups_[group] = !IsCollapsed(group);
+    }
+
+    private bool IsCollapsed(string group) =>
+        collapsedGroups_.TryGetValue(group, out var collapsed) && collapsed;
+
+    private bool ShouldShowGroupContents(string group) =>
+        !string.IsNullOrWhiteSpace(searchText_) || !IsCollapsed(group);
 
     private static string GetDisplayPath(ConfigFileInfo file)
     {
