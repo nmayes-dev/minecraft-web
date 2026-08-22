@@ -4,9 +4,7 @@
 
 <PageTitle>Minecraft Admin</PageTitle>
 
-
 <div class="app-page">
-
     <h1>Server</h1>
 
     @if (loading_)
@@ -22,7 +20,7 @@
         <section class="card-grid">
             <article class="card">
                 <div class="label">Status</div>
-                <div class="value">@(status_.Online ? "Online" : "Offline")</div>
+                <div class="value">@(restarting_ ? "Restarting…" : status_.Online ? "Online" : "Offline")</div>
             </article>
             <article class="card">
                 <div class="label">Players</div>
@@ -30,7 +28,7 @@
             </article>
         </section>
 
-        @if (!string.IsNullOrWhiteSpace(status_.Error))
+        @if (!restarting_ && !string.IsNullOrWhiteSpace(status_.Error))
         {
             <div class="error">@status_.Error</div>
         }
@@ -54,18 +52,36 @@
     }
 
     <div class="actions">
-        <button @onclick="RefreshAsync" disabled="@loading_">Refresh</button>
-        <button class="danger" @onclick="RestartAsync" disabled="@(!CanRestart)">Restart</button>
+        <button @onclick="RefreshAsync" disabled="@(loading_ || restarting_)">Refresh</button>
+        <button class="danger" @onclick="RestartAsync" disabled="@(!CanRestart)">
+            @if (restarting_)
+            {
+                <span class="spinner" aria-hidden="true"></span>
+                <span>Restarting…</span>
+            }
+            else
+            {
+                <span>Restart</span>
+            }
+        </button>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(message_))
     {
-        <p>@message_</p>
+        <p class="restart-message">
+            @if (restarting_)
+            {
+                <span class="spinner" aria-hidden="true"></span>
+            }
+            <span>@message_</span>
+        </p>
     }
 </div>
 
-
 @code {
+    private static readonly TimeSpan RestartTimeout = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan RestartPollInterval = TimeSpan.FromSeconds(2);
+
     private MinecraftStatus? status_;
     private bool loading_ = true;
     private bool restarting_;
@@ -84,14 +100,52 @@
 
     private async Task RestartAsync()
     {
+        if (!CanRestart)
+            return;
+
         restarting_ = true;
+        message_ = "Sending restart command…";
+
         try
         {
             await Minecraft.RestartAsync();
-            message_ = "Restart command sent.";
+            message_ = "Waiting for the server to come back online…";
+
+            var deadline = DateTimeOffset.UtcNow + RestartTimeout;
+            var observedOffline = false;
+
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                await Task.Delay(RestartPollInterval);
+
+                var polledStatus = await Minecraft.GetStatusAsync();
+                status_ = polledStatus;
+
+                if (!polledStatus.Online)
+                {
+                    observedOffline = true;
+                    await InvokeAsync(StateHasChanged);
+                    continue;
+                }
+
+                // Normally we observe the RCON outage first. If the restart is quick enough
+                // to occur between polls, an online response still confirms the server is available.
+                if (observedOffline || DateTimeOffset.UtcNow >= deadline - RestartTimeout + TimeSpan.FromSeconds(6))
+                {
+                    message_ = "Server is back online.";
+                    return;
+                }
+            }
+
+            status_ = await Minecraft.GetStatusAsync();
+            if (status_.Online)
+                message_ = "Server is online, but the restart transition could not be confirmed.";
+            else
+                message_ = $"Server did not come back online within {RestartTimeout.TotalSeconds:0} seconds and is currently offline.";
         }
         catch (Exception ex)
         {
+            status_ = await Minecraft.GetStatusAsync();
             message_ = ex.Message;
         }
         finally

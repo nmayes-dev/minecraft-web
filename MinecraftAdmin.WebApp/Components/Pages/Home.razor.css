@@ -1,0 +1,52 @@
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 1.25rem 0;
+}
+
+.label {
+    color: #9ca9b6;
+    font-size: .9rem;
+}
+
+.value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-top: .25rem;
+}
+
+.actions {
+    display: flex;
+    gap: .75rem;
+    margin-top: 1rem;
+}
+
+.actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+}
+
+.restart-message {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+}
+
+.spinner {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin .75s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

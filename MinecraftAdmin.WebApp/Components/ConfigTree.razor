@@ -1,0 +1,67 @@
+@namespace MinecraftAdmin.WebApp.Components
+
+@foreach (var node in Nodes)
+{
+    if (node.IsDirectory)
+    {
+        var expanded = SearchActive || !CollapsedFolders.Contains(node.Key);
+        <div class="tree-directory">
+            <button type="button"
+                    class="tree-directory-title"
+                    aria-expanded="@expanded"
+                    @onclick="() => ToggleDirectory(node.Key)">
+                <span class="tree-chevron @(expanded ? "expanded" : null)">▶</span>
+                <span class="tree-directory-name">@node.Name</span>
+                <span class="tree-directory-count">@CountFiles(node)</span>
+            </button>
+
+            @if (expanded)
+            {
+                <div class="tree-children">
+                    <ConfigTree Nodes="node.Children"
+                                SelectedPath="SelectedPath"
+                                OnFileSelected="OnFileSelected"
+                                CollapsedFolders="CollapsedFolders"
+                                SearchActive="SearchActive" />
+                </div>
+            }
+        </div>
+    }
+    else if (node.File is not null)
+    {
+        <button type="button"
+                class="tree-file @(SelectedPath == node.File.Path ? "selected" : null)"
+                title="@node.File.Path"
+                @onclick="() => OnFileSelected.InvokeAsync(node.File.Path)">
+            <span>@node.File.Name</span>
+            <small>@node.File.Format</small>
+        </button>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ConfigTreeNode> Nodes { get; set; } = [];
+
+    [Parameter]
+    public string? SelectedPath { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<string> OnFileSelected { get; set; }
+
+    [Parameter, EditorRequired]
+    public HashSet<string> CollapsedFolders { get; set; } = [];
+
+    [Parameter]
+    public bool SearchActive { get; set; }
+
+    private void ToggleDirectory(string key)
+    {
+        if (!CollapsedFolders.Add(key))
+            CollapsedFolders.Remove(key);
+    }
+
+    private static int CountFiles(ConfigTreeNode node) => node.IsDirectory
+        ? node.Children.Sum(CountFiles)
+        : 1;
+}

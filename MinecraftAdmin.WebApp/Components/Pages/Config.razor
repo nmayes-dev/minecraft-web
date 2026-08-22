@@ -4,8 +4,7 @@
 
 <PageTitle>Configuration</PageTitle>
 
-<div class="app-page">
-
+<div class="app-page config-page">
     <h1>Configuration</h1>
 
     @if (loadingFiles_)
@@ -42,7 +41,7 @@
                     <input type="search"
                            value="@searchText_"
                            @oninput="OnSearchChanged"
-                           placeholder="Search configs or fields…"
+                           placeholder="Search configs…"
                            aria-label="Search configuration files" />
                     @if (!string.IsNullOrWhiteSpace(searchText_))
                     {
@@ -59,29 +58,25 @@
                 <div class="config-list">
                     @foreach (var group in VisibleGroups)
                     {
+                        var expanded = ShouldShowGroupContents(group.Key);
                         <div class="config-group">
                             <button type="button"
                                     class="config-group-title"
-                                    aria-expanded="@(!IsCollapsed(group.Key))"
+                                    aria-expanded="@expanded"
                                     @onclick="() => ToggleGroup(group.Key)">
-                                <span class="config-group-chevron @(ShouldShowGroupContents(group.Key) ? "expanded" : null)">▶</span>
+                                <span class="config-group-chevron @(expanded ? "expanded" : null)">▶</span>
                                 <span>@group.Key</span>
                                 <span class="config-group-count">@group.Count()</span>
                             </button>
 
-                            @if (ShouldShowGroupContents(group.Key))
+                            @if (expanded)
                             {
                                 <div class="config-group-files">
-                                    @foreach (var file in group)
-                                    {
-                                        <button type="button"
-                                                class="config-file @(document_?.Path == file.Path ? "selected" : null)"
-                                                title="@file.Path"
-                                                @onclick="() => OpenAsync(file.Path)">
-                                            <span>@file.Name</span>
-                                            <small>@GetDisplayPath(file)</small>
-                                        </button>
-                                    }
+                                    <ConfigTree Nodes="BuildTree(group)"
+                                                SelectedPath="document_?.Path"
+                                                OnFileSelected="OpenAsync"
+                                                CollapsedFolders="collapsedFolders_"
+                                                SearchActive="@IsSearching" />
                                 </div>
                             }
                         </div>
@@ -96,7 +91,6 @@
                         <p class="muted config-search-empty">No configuration files match your search.</p>
                     }
                 </div>
-
             </aside>
 
             <section class="config-editor panel">
@@ -186,10 +180,10 @@
     }
 </div>
 
-
 @code {
     private IReadOnlyList<ConfigFileInfo> files_ = [];
     private readonly Dictionary<string, bool> collapsedGroups_ = new(StringComparer.Ordinal);
+    private readonly HashSet<string> collapsedFolders_ = new(StringComparer.OrdinalIgnoreCase);
     private ConfigDocument? document_;
     private bool loadingFiles_ = true;
     private bool loadingDocument_;
@@ -198,6 +192,8 @@
     private string searchText_ = string.Empty;
     private string? error_;
     private string? message_;
+
+    private bool IsSearching => !string.IsNullOrWhiteSpace(searchText_);
 
     private IEnumerable<ConfigFileInfo> FilteredFiles
     {
@@ -298,21 +294,77 @@
 
     private void ClearSearch() => searchText_ = string.Empty;
 
-    private void ToggleGroup(string group)
-    {
-        collapsedGroups_[group] = !IsCollapsed(group);
-    }
+    private void ToggleGroup(string group) => collapsedGroups_[group] = !IsCollapsed(group);
 
     private bool IsCollapsed(string group) =>
         collapsedGroups_.TryGetValue(group, out var collapsed) && collapsed;
 
-    private bool ShouldShowGroupContents(string group) =>
-        !string.IsNullOrWhiteSpace(searchText_) || !IsCollapsed(group);
+    private bool ShouldShowGroupContents(string group) => IsSearching || !IsCollapsed(group);
 
-    private static string GetDisplayPath(ConfigFileInfo file)
+    private static IReadOnlyList<ConfigTreeNode> BuildTree(IEnumerable<ConfigFileInfo> files)
     {
-        var slash = file.Path.LastIndexOf('/');
-        return slash < 0 ? file.Format : $"{file.Path[..slash]} · {file.Format}";
+        var roots = new List<ConfigTreeNode>();
+
+        foreach (var file in files)
+        {
+            var relativePath = StripGroupPrefix(file);
+            var parts = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var current = roots;
+            var keyParts = new List<string> { file.Group };
+
+            for (var i = 0; i < parts.Length - 1; ++i)
+            {
+                var part = parts[i];
+                keyParts.Add(part);
+                var key = string.Join('/', keyParts);
+                var directory = current.FirstOrDefault(node => node.IsDirectory && string.Equals(node.Name, part, StringComparison.OrdinalIgnoreCase));
+
+                if (directory is null)
+                {
+                    directory = new ConfigTreeNode { Name = part, Key = key };
+                    current.Add(directory);
+                }
+
+                current = directory.Children;
+            }
+
+            current.Add(new ConfigTreeNode
+            {
+                Name = file.Name,
+                Key = file.Path,
+                File = file
+            });
+        }
+
+        SortTree(roots);
+        return roots;
+    }
+
+    private static string StripGroupPrefix(ConfigFileInfo file)
+    {
+        var prefix = file.Group switch
+        {
+            "Default Configs" => "defaultconfigs/",
+            "Mod Configs" => "config/",
+            _ => string.Empty
+        };
+
+        return prefix.Length > 0 && file.Path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? file.Path[prefix.Length..]
+            : file.Path;
+    }
+
+    private static void SortTree(List<ConfigTreeNode> nodes)
+    {
+        nodes.Sort((left, right) =>
+        {
+            if (left.IsDirectory != right.IsDirectory)
+                return left.IsDirectory ? -1 : 1;
+            return StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+        });
+
+        foreach (var node in nodes.Where(node => node.IsDirectory))
+            SortTree(node.Children);
     }
 
     private static string FieldElementId(ConfigField field) => "config-" + field.Id

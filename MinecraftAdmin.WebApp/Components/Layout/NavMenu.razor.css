@@ -1,0 +1,24 @@
+.nav-menu {
+    display: grid;
+    gap: .4rem;
+}
+
+.nav-menu ::deep a {
+    color: #bfc9d4;
+    text-decoration: none;
+    padding: .65rem .75rem;
+    border-radius: .45rem;
+}
+
+.nav-menu ::deep a.active,
+.nav-menu ::deep a:hover {
+    background: #242e38;
+    color: white;
+}
+
+@media (max-width: 720px) {
+    .nav-menu {
+        display: flex;
+        flex-wrap: wrap;
+    }
+}

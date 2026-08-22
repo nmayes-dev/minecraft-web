@@ -1,0 +1,294 @@
+.config-page {
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+}
+
+.config-layout {
+    display: grid;
+    grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+    gap: 1rem;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.config-browser,
+.config-editor {
+    margin: 0;
+    min-height: 0;
+}
+
+.config-browser {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    overflow: hidden;
+}
+
+.config-list {
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: .25rem;
+}
+
+.config-editor {
+    overflow-y: auto;
+}
+
+.config-browser-header,
+.config-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.config-browser-header {
+    margin-bottom: 1rem;
+}
+
+.config-browser-header button {
+    padding: .35rem .55rem;
+    font-size: .85rem;
+}
+
+.icon-button {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+}
+
+.icon-button svg,
+.config-search svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.config-search {
+    position: relative;
+    margin-bottom: .9rem;
+}
+
+.config-search > svg {
+    position: absolute;
+    left: .65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8997a4;
+    pointer-events: none;
+}
+
+.config-search input {
+    width: 100%;
+    background: #11161b;
+    border: 1px solid #3a4652;
+    color: white;
+    border-radius: .4rem;
+    padding: .55rem 2.2rem .55rem 2.15rem;
+}
+
+.config-search input::placeholder {
+    color: #74818e;
+}
+
+.config-search-clear {
+    position: absolute;
+    right: .35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    padding: .15rem .35rem;
+    color: #8997a4;
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.config-search-clear:hover:not(:disabled) {
+    background: transparent;
+    color: white;
+}
+
+.config-search-empty {
+    padding: .4rem .45rem;
+}
+
+.config-group + .config-group {
+    margin-top: .75rem;
+}
+
+.config-group-title {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: .4rem;
+    border: 0;
+    background: transparent;
+    color: #8f9eac;
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    text-align: left;
+    margin: 0 0 .25rem;
+    padding: .35rem .45rem;
+}
+
+.config-group-title:hover:not(:disabled) {
+    background: #202832;
+}
+
+.config-group-chevron {
+    display: inline-block;
+    font-size: .65rem;
+    transition: transform .12s ease;
+}
+
+.config-group-chevron.expanded {
+    transform: rotate(90deg);
+}
+
+.config-group-count {
+    min-width: 1.4rem;
+    text-align: center;
+    color: #74818e;
+    font-size: .7rem;
+}
+
+.config-group-files {
+    display: grid;
+}
+
+.config-editor-header {
+    border-bottom: 1px solid #2b343e;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.config-editor-header h2 {
+    margin: 0 0 .25rem;
+}
+
+.config-path,
+.muted {
+    color: #8f9eac;
+}
+
+.config-path {
+    font-size: .82rem;
+}
+
+.config-empty {
+    min-height: 320px;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    color: #9ca9b6;
+}
+
+.config-empty h2 {
+    color: #d9e0e7;
+    margin-bottom: .3rem;
+}
+
+.config-section + .config-section {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #2b343e;
+}
+
+.config-section h3 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+    color: #d9e0e7;
+}
+
+.config-fields {
+    display: grid;
+    gap: .75rem;
+}
+
+.config-field {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(180px, 1.2fr);
+    gap: 1rem;
+    align-items: center;
+}
+
+.config-field-label {
+    min-width: 0;
+}
+
+.config-field-label label {
+    display: block;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.config-field-label small {
+    display: block;
+    color: #8997a4;
+    margin-top: .2rem;
+    line-height: 1.3;
+}
+
+.config-field > input {
+    width: 100%;
+    background: #11161b;
+    border: 1px solid #3a4652;
+    color: white;
+    border-radius: .4rem;
+    padding: .55rem .65rem;
+}
+
+.config-switch {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    justify-self: start;
+    color: #c7d0d9;
+}
+
+.config-switch input {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+.success {
+    color: #a8d8ae;
+}
+
+@media (max-width: 900px) {
+    .config-page {
+        overflow-y: auto;
+        grid-template-rows: auto auto;
+    }
+
+    .config-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+
+    .config-browser {
+        height: 360px;
+    }
+
+    .config-editor {
+        overflow: visible;
+    }
+}
+
+@media (max-width: 600px) {
+    .config-field {
+        grid-template-columns: 1fr;
+        gap: .4rem;
+    }
+}
