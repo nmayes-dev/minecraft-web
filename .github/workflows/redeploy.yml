@@ -1,0 +1,19 @@
+name: Redeploy Minecraft Admin App
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  redeploy:
+    runs-on: [self-hosted, home-server]
+
+    steps:
+      - name: Deploy 
+        if: github.ref == 'refs/heads/master'
+        run: |
+          cd "$MINECRAFT_WEB_PATH"
+          docker compose restart minecraft-web
+        env:
+          MINECRAFT_WEB_PATH: ${{ vars.MINECRAFT_WEB_PATH }}

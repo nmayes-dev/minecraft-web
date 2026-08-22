@@ -52,7 +52,7 @@ else
 
 <div class="actions">
     <button @onclick="RefreshAsync" disabled="@loading_">Refresh</button>
-    <button class="danger" @onclick="RestartAsync" disabled="@(!CanRestart)">Restart server</button>
+    <button class="danger" @onclick="RestartAsync" disabled="@(!CanRestart)">Restart</button>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(message_))
@@ -83,7 +83,7 @@ else
         try
         {
             await Minecraft.RestartAsync();
-            message_ = "Restart command sent. Docker should start Minecraft again automatically.";
+            message_ = "Restart command sent.";
         }
         catch (Exception ex)
         {
