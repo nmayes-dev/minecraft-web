@@ -9,7 +9,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.Configure<MinecraftOptions>(builder.Configuration.GetSection("Minecraft"));
 builder.Services.AddSingleton<RconClient>();
-builder.Services.AddSingleton<ServerPropertiesService>();
+builder.Services.AddSingleton<ConfigurationService>();
 builder.Services.AddSingleton<MinecraftService>();
 
 var app = builder.Build();
@@ -45,12 +45,15 @@ api.MapPost("/server/restart", async (MinecraftService minecraft, CancellationTo
     return Results.Accepted();
 });
 
-api.MapGet("/config/server", async (ServerPropertiesService properties, CancellationToken ct) =>
-    Results.Ok(await properties.GetAsync(ct)));
+api.MapGet("/config/files", async (ConfigurationService configuration, CancellationToken ct) =>
+    Results.Ok(await configuration.GetFilesAsync(ct)));
 
-api.MapPut("/config/server", async (ServerSettings settings, ServerPropertiesService properties, CancellationToken ct) =>
+api.MapGet("/config/file/{**path}", async (string path, ConfigurationService configuration, CancellationToken ct) =>
+    Results.Ok(await configuration.GetAsync(path, ct)));
+
+api.MapPut("/config/file/{**path}", async (string path, ConfigField[] fields, ConfigurationService configuration, CancellationToken ct) =>
 {
-    await properties.UpdateAsync(settings, ct);
+    await configuration.UpdateAsync(path, fields, ct);
     return Results.NoContent();
 });
 
