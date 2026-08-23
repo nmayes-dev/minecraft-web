@@ -25,6 +25,7 @@
 }
 
 .config-list {
+    container-type: inline-size;
     min-width: 0;
     min-height: 0;
     overflow-x: auto;
@@ -123,12 +124,19 @@
     padding: .4rem .45rem;
 }
 
+.config-group {
+    width: max-content;
+    min-width: 100%;
+}
+
 .config-group + .config-group {
     margin-top: .75rem;
 }
 
 .config-group-title {
-    width: 100%;
+    position: sticky;
+    left: 0;
+    z-index: 2;
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
@@ -168,6 +176,8 @@
 
 .config-group-files {
     display: grid;
+    width: max-content;
+    min-width: 100%;
 }
 
 .config-editor-header {
