@@ -1,5 +1,6 @@
 @page "/config"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject ConfigurationService Configuration
 
 <PageTitle>Configuration</PageTitle>
@@ -40,7 +41,7 @@
                     </svg>
                     <input type="search"
                            value="@searchText_"
-                           @oninput="OnSearchChanged"
+                           @oninput="OnSearchChangedAsync"
                            placeholder="Search configs…"
                            aria-label="Search configuration files" />
                     @if (!string.IsNullOrWhiteSpace(searchText_))
@@ -49,30 +50,30 @@
                                 class="config-search-clear"
                                 title="Clear search"
                                 aria-label="Clear search"
-                                @onclick="ClearSearch">
+                                @onclick="ClearSearchAsync">
                             ×
                         </button>
                     }
                 </div>
 
                 <div class="config-list">
-                    @foreach (var group in VisibleGroups)
+                    @foreach (var group in visibleGroups_)
                     {
-                        var expanded = ShouldShowGroupContents(group.Key);
+                        var expanded = ShouldShowGroupContents(group.Name);
                         <div class="config-group">
                             <button type="button"
                                     class="config-group-title"
                                     aria-expanded="@expanded"
-                                    @onclick="() => ToggleGroup(group.Key)">
+                                    @onclick="() => ToggleGroup(group.Name)">
                                 <span class="config-group-chevron @(expanded ? "expanded" : null)">▶</span>
-                                <span>@group.Key</span>
-                                <span class="config-group-count">@group.Count()</span>
+                                <span>@group.Name</span>
+                                <span class="config-group-count">@group.Files.Count</span>
                             </button>
 
                             @if (expanded)
                             {
                                 <div class="config-group-files">
-                                    <ConfigTree Nodes="BuildTree(group)"
+                                    <ConfigTree Nodes="group.Tree"
                                                 SelectedPath="document_?.Path"
                                                 OnFileSelected="OpenAsync"
                                                 OpenFolders="openFolders_"
@@ -86,7 +87,7 @@
                     {
                         <p class="muted">No supported configuration files were found.</p>
                     }
-                    else if (!FilteredFiles.Any())
+                    else if (visibleGroups_.Count == 0)
                     {
                         <p class="muted config-search-empty">No configuration files match your search.</p>
                     }
@@ -94,11 +95,7 @@
             </aside>
 
             <section class="config-editor panel">
-                @if (loadingDocument_)
-                {
-                    <p>Loading configuration…</p>
-                }
-                else if (document_ is null)
+                @if (document_ is null && !loadingDocument_ && string.IsNullOrWhiteSpace(message_))
                 {
                     <div class="config-empty">
                         <h2>Select a configuration file</h2>
@@ -108,72 +105,97 @@
                 else
                 {
                     <div class="config-editor-header">
-                        <div>
-                            <h2>@document_.Name</h2>
-                            <div class="config-path">@document_.Path · @document_.Format</div>
+                        <div class="config-editor-heading">
+                            @if (document_ is not null)
+                            {
+                                <h2>@document_.Name</h2>
+                                <div class="config-path">@document_.Path · @document_.Format</div>
+                            }
+                            else
+                            {
+                                <h2>Configuration Editor</h2>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(message_))
+                            {
+                                <div class="config-editor-message @(saveFailed_ ? "error" : "success")">@message_</div>
+                            }
                         </div>
-                        <button type="button" @onclick="SaveAsync" disabled="@saving_">@(saving_ ? "Saving…" : "Save")</button>
+
+                        @if (document_ is not null)
+                        {
+                            <button type="button" @onclick="SaveAsync" disabled="@(saving_ || loadingDocument_)">
+                                @(saving_ ? "Saving…" : "Save")
+                            </button>
+                        }
                     </div>
 
-                    @if (document_.Fields.Count == 0)
-                    {
-                        <p class="muted">This file does not contain any scalar values that the dynamic editor currently supports.</p>
-                    }
-                    else
-                    {
-                        @foreach (var section in document_.Fields.GroupBy(x => x.Section ?? string.Empty))
+                    <div class="config-editor-content">
+                        @if (loadingDocument_)
                         {
-                            <div class="config-section">
-                                @if (!string.IsNullOrWhiteSpace(section.Key))
-                                {
-                                    <h3>@section.Key</h3>
-                                }
-
-                                <div class="config-fields">
-                                    @foreach (var field in section)
-                                    {
-                                        <div class="config-field">
-                                            <div class="config-field-label">
-                                                <label for="@FieldElementId(field)">@field.Key</label>
-                                                @if (!string.IsNullOrWhiteSpace(field.Description))
-                                                {
-                                                    <small>@field.Description</small>
-                                                }
-                                            </div>
-
-                                            @if (field.Kind == ConfigValueKind.Boolean)
-                                            {
-                                                <label class="config-switch">
-                                                    <input id="@FieldElementId(field)"
-                                                           type="checkbox"
-                                                           checked="@IsChecked(field)"
-                                                           @onchange="e => SetBoolean(field, e.Value)" />
-                                                    <span>@(IsChecked(field) ? "Enabled" : "Disabled")</span>
-                                                </label>
-                                            }
-                                            else if (field.Kind == ConfigValueKind.Integer)
-                                            {
-                                                <input id="@FieldElementId(field)" type="number" step="1" @bind="field.Value" />
-                                            }
-                                            else if (field.Kind == ConfigValueKind.Decimal)
-                                            {
-                                                <input id="@FieldElementId(field)" type="number" step="any" @bind="field.Value" />
-                                            }
-                                            else
-                                            {
-                                                <input id="@FieldElementId(field)" type="text" @bind="field.Value" />
-                                            }
-                                        </div>
-                                    }
-                                </div>
+                            <p>Loading configuration…</p>
+                        }
+                        else if (document_ is null)
+                        {
+                            <div class="config-empty">
+                                <p>Unable to load the selected configuration file.</p>
                             </div>
                         }
-                    }
+                        else if (document_.Fields.Count == 0)
+                        {
+                            <p class="muted">This file does not contain any scalar values that the dynamic editor currently supports.</p>
+                        }
+                        else
+                        {
+                            @foreach (var section in document_.Fields.GroupBy(x => x.Section ?? string.Empty))
+                            {
+                                <div class="config-section">
+                                    @if (!string.IsNullOrWhiteSpace(section.Key))
+                                    {
+                                        <h3>@section.Key</h3>
+                                    }
 
-                    @if (!string.IsNullOrWhiteSpace(message_))
-                    {
-                        <p class="@(saveFailed_ ? "error" : "success")">@message_</p>
-                    }
+                                    <div class="config-fields">
+                                        @foreach (var field in section)
+                                        {
+                                            <div class="config-field">
+                                                <div class="config-field-label">
+                                                    <label for="@FieldElementId(field)">@field.Key</label>
+                                                    @if (!string.IsNullOrWhiteSpace(field.Description))
+                                                    {
+                                                        <small>@field.Description</small>
+                                                    }
+                                                </div>
+
+                                                @if (field.Kind == ConfigValueKind.Boolean)
+                                                {
+                                                    <label class="config-switch">
+                                                        <input id="@FieldElementId(field)"
+                                                               type="checkbox"
+                                                               checked="@IsChecked(field)"
+                                                               @onchange="e => SetBoolean(field, e.Value)" />
+                                                        <span>@(IsChecked(field) ? "Enabled" : "Disabled")</span>
+                                                    </label>
+                                                }
+                                                else if (field.Kind == ConfigValueKind.Integer)
+                                                {
+                                                    <input id="@FieldElementId(field)" type="number" step="1" @bind="field.Value" />
+                                                }
+                                                else if (field.Kind == ConfigValueKind.Decimal)
+                                                {
+                                                    <input id="@FieldElementId(field)" type="number" step="any" @bind="field.Value" />
+                                                }
+                                                else
+                                                {
+                                                    <input id="@FieldElementId(field)" type="text" @bind="field.Value" />
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
                 }
             </section>
         </div>
@@ -181,7 +203,10 @@
 </div>
 
 @code {
+    private static readonly string[] GroupOrder = ["Server Files", "Default Configs", "Mod Configs"];
+
     private IReadOnlyList<ConfigFileInfo> files_ = [];
+    private IReadOnlyList<ConfigGroupView> visibleGroups_ = [];
     private readonly Dictionary<string, bool> openGroups_ = new(StringComparer.Ordinal);
     private readonly HashSet<string> openFolders_ = new(StringComparer.OrdinalIgnoreCase);
     private ConfigDocument? document_;
@@ -192,47 +217,46 @@
     private string searchText_ = string.Empty;
     private string? error_;
     private string? message_;
+    private CancellationTokenSource? searchCts_;
+    private CancellationTokenSource? indexingCts_;
+    private int refreshGeneration_;
 
     private bool IsSearching => !string.IsNullOrWhiteSpace(searchText_);
-
-    private IEnumerable<ConfigFileInfo> FilteredFiles
-    {
-        get
-        {
-            var terms = searchText_
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            if (terms.Length == 0)
-                return files_;
-
-            return files_.Where(file =>
-            {
-                var searchable = string.IsNullOrWhiteSpace(file.SearchText)
-                    ? $"{file.Name} {file.Path}"
-                    : file.SearchText;
-
-                return terms.All(term => searchable.Contains(term, StringComparison.OrdinalIgnoreCase));
-            });
-        }
-    }
-
-    private IEnumerable<IGrouping<string, ConfigFileInfo>> VisibleGroups => FilteredFiles.GroupBy(file => file.Group);
 
     protected override async Task OnInitializedAsync() => await RefreshAsync();
 
     private async Task RefreshAsync()
     {
+        var generation = ++refreshGeneration_;
+        indexingCts_?.Cancel();
+        indexingCts_?.Dispose();
+        indexingCts_ = new CancellationTokenSource();
+
         loadingFiles_ = true;
         error_ = null;
+
         try
         {
             var selectedPath = document_?.Path;
-            files_ = await Configuration.GetFilesAsync();
+            files_ = await Configuration.GetFilesAsync(indexingCts_.Token);
+            visibleGroups_ = await BuildGroupViewsAsync(files_, searchText_, indexingCts_.Token);
+
+            // Show the navigator as soon as enumeration/tree construction is complete. Loading the
+            // selected document and indexing every file no longer hold up the initial file list.
+            loadingFiles_ = false;
+            StateHasChanged();
+
+            // Search starts with filename/path matching immediately. Field-key indexing happens
+            // independently so it does not delay the initial navigator render.
+            _ = PopulateSearchIndexAsync(files_, generation, indexingCts_.Token);
 
             if (selectedPath is not null && files_.Any(x => x.Path == selectedPath))
                 await OpenAsync(selectedPath);
             else if (document_ is null && files_.Count > 0)
                 await OpenAsync(files_[0].Path);
+        }
+        catch (OperationCanceledException) when (generation != refreshGeneration_)
+        {
         }
         catch (Exception ex)
         {
@@ -240,7 +264,41 @@
         }
         finally
         {
-            loadingFiles_ = false;
+            if (generation == refreshGeneration_)
+                loadingFiles_ = false;
+        }
+    }
+
+    private async Task PopulateSearchIndexAsync(
+        IReadOnlyList<ConfigFileInfo> files,
+        int generation,
+        CancellationToken ct)
+    {
+        try
+        {
+            var index = await Configuration.GetSearchIndexAsync(files, ct);
+
+            await InvokeAsync(async () =>
+            {
+                if (generation != refreshGeneration_ || ct.IsCancellationRequested)
+                    return;
+
+                foreach (var file in files_)
+                {
+                    if (index.TryGetValue(file.Path, out var searchText))
+                        file.SearchText = searchText;
+                }
+
+                // Only the active search needs rebuilding. With no search, the navigator tree
+                // is already complete and does not need another render.
+                if (IsSearching)
+                    visibleGroups_ = await BuildGroupViewsAsync(files_, searchText_, ct);
+
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 
@@ -249,6 +307,7 @@
         loadingDocument_ = true;
         message_ = null;
         saveFailed_ = false;
+
         try
         {
             document_ = await Configuration.GetAsync(path);
@@ -273,6 +332,7 @@
         saving_ = true;
         message_ = null;
         saveFailed_ = false;
+
         try
         {
             await Configuration.UpdateAsync(document_.Path, document_.Fields);
@@ -290,9 +350,35 @@
         }
     }
 
-    private void OnSearchChanged(ChangeEventArgs args) => searchText_ = args.Value?.ToString() ?? string.Empty;
+    private async Task OnSearchChangedAsync(ChangeEventArgs args)
+    {
+        searchText_ = args.Value?.ToString() ?? string.Empty;
 
-    private void ClearSearch() => searchText_ = string.Empty;
+        searchCts_?.Cancel();
+        searchCts_?.Dispose();
+        searchCts_ = new CancellationTokenSource();
+        var ct = searchCts_.Token;
+
+        // Update the input/clear button immediately, but debounce the tree rebuild so rapidly
+        // typed characters do not repeatedly rebuild a large tree.
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(120, ct);
+            visibleGroups_ = await BuildGroupViewsAsync(files_, searchText_, ct);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task ClearSearchAsync()
+    {
+        searchText_ = string.Empty;
+        searchCts_?.Cancel();
+        visibleGroups_ = await BuildGroupViewsAsync(files_, searchText_, CancellationToken.None);
+    }
 
     private void ToggleGroup(string group) => openGroups_[group] = !IsOpen(group);
 
@@ -301,27 +387,75 @@
 
     private bool ShouldShowGroupContents(string group) => IsSearching || IsOpen(group);
 
+    private static Task<IReadOnlyList<ConfigGroupView>> BuildGroupViewsAsync(
+        IReadOnlyList<ConfigFileInfo> files,
+        string searchText,
+        CancellationToken ct)
+    {
+        return Task.Run<IReadOnlyList<ConfigGroupView>>(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var terms = searchText.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            var matchingFiles = terms.Length == 0
+                ? files
+                : files.Where(file =>
+                {
+                    var searchable = string.IsNullOrWhiteSpace(file.SearchText)
+                        ? $"{file.Name} {file.Path}"
+                        : file.SearchText;
+
+                    return terms.All(term =>
+                        searchable.Contains(term, StringComparison.OrdinalIgnoreCase));
+                }).ToList();
+
+            var groups = new List<ConfigGroupView>();
+
+            foreach (var groupName in GroupOrder)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var groupFiles = matchingFiles
+                    .Where(file => string.Equals(file.Group, groupName, StringComparison.Ordinal))
+                    .ToList();
+
+                if (groupFiles.Count == 0)
+                    continue;
+
+                groups.Add(new ConfigGroupView(
+                    groupName,
+                    groupFiles,
+                    BuildTree(groupFiles)));
+            }
+
+            return groups;
+        }, ct);
+    }
+
     private static IReadOnlyList<ConfigTreeNode> BuildTree(IEnumerable<ConfigFileInfo> files)
     {
         var roots = new List<ConfigTreeNode>();
+        var directories = new Dictionary<string, ConfigTreeNode>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var file in files)
         {
             var relativePath = StripGroupPrefix(file);
             var parts = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
             var current = roots;
-            var keyParts = new List<string> { file.Group };
+            var key = file.Group;
 
             for (var i = 0; i < parts.Length - 1; ++i)
             {
                 var part = parts[i];
-                keyParts.Add(part);
-                var key = string.Join('/', keyParts);
-                var directory = current.FirstOrDefault(node => node.IsDirectory && string.Equals(node.Name, part, StringComparison.OrdinalIgnoreCase));
+                key = $"{key}/{part}";
 
-                if (directory is null)
+                if (!directories.TryGetValue(key, out var directory))
                 {
                     directory = new ConfigTreeNode { Name = part, Key = key };
+                    directories.Add(key, directory);
                     current.Add(directory);
                 }
 
@@ -360,6 +494,7 @@
         {
             if (left.IsDirectory != right.IsDirectory)
                 return left.IsDirectory ? -1 : 1;
+
             return StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
         });
 
@@ -373,7 +508,8 @@
         .Replace(']', '-')
         .Replace(':', '-');
 
-    private static bool IsChecked(ConfigField field) => bool.TryParse(field.Value, out var value) && value;
+    private static bool IsChecked(ConfigField field) =>
+        bool.TryParse(field.Value, out var value) && value;
 
     private static void SetBoolean(ConfigField field, object? value)
     {
@@ -384,4 +520,17 @@
             _ => "false"
         };
     }
+
+    public void Dispose()
+    {
+        searchCts_?.Cancel();
+        searchCts_?.Dispose();
+        indexingCts_?.Cancel();
+        indexingCts_?.Dispose();
+    }
+
+    private sealed record ConfigGroupView(
+        string Name,
+        IReadOnlyList<ConfigFileInfo> Files,
+        IReadOnlyList<ConfigTreeNode> Tree);
 }

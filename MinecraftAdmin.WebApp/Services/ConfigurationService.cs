@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -17,37 +18,57 @@ public sealed partial class ConfigurationService(IOptions<MinecraftOptions> opti
         ".properties", ".cfg", ".conf", ".toml", ".json", ".json5"
     };
 
-    public async Task<IReadOnlyList<ConfigFileInfo>> GetFilesAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<ConfigFileInfo>> GetFilesAsync(CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-
-        var files = new List<ConfigFileInfo>();
-        AddFile(files, Path.Combine(dataPath_, "server.properties"), "Server Files");
-        AddDirectory(files, Path.Combine(dataPath_, "defaultconfigs"), "Default Configs", ct);
-        AddDirectory(files, Path.Combine(dataPath_, "config"), "Mod Configs", ct);
-
-        var orderedFiles = files
-            .OrderBy(x => GetGroupOrder(x.Group))
-            .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        foreach (var file in orderedFiles)
+        return Task.Run<IReadOnlyList<ConfigFileInfo>>(() =>
         {
             ct.ThrowIfCancellationRequested();
 
-            try
-            {
-                var document = await GetAsync(file.Path, ct);
-                file.SearchText = BuildSearchText(file, document);
-            }
-            catch
-            {
-                // A malformed/temporarily unavailable config should still appear in the navigator.
-                file.SearchText = $"{file.Name} {file.Path}";
-            }
-        }
+            var files = new List<ConfigFileInfo>();
+            AddFile(files, Path.Combine(dataPath_, "server.properties"), "Server Files");
+            AddDirectory(files, Path.Combine(dataPath_, "defaultconfigs"), "Default Configs", ct);
+            AddDirectory(files, Path.Combine(dataPath_, "config"), "Mod Configs", ct);
 
-        return orderedFiles;
+            return files
+                .OrderBy(x => GetGroupOrder(x.Group))
+                .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }, ct);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> GetSearchIndexAsync(
+        IReadOnlyCollection<ConfigFileInfo> files,
+        CancellationToken ct = default)
+    {
+        var index = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        await Parallel.ForEachAsync(
+            files,
+            new ParallelOptions
+            {
+                CancellationToken = ct,
+                MaxDegreeOfParallelism = 4
+            },
+            async (file, token) =>
+            {
+                try
+                {
+                    var document = await GetAsync(file.Path, token);
+                    index[file.Path] = BuildSearchText(file, document);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // A malformed/temporarily unavailable config should still be searchable by
+                    // its filename and path.
+                    index[file.Path] = $"{file.Name} {file.Path}";
+                }
+            });
+
+        return index;
     }
 
     private static int GetGroupOrder(string group) => group switch

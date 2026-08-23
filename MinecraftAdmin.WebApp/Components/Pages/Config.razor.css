@@ -5,7 +5,7 @@
 
 .config-layout {
     display: grid;
-    grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
     gap: 1rem;
     min-height: 0;
     height: 100%;
@@ -25,13 +25,17 @@
 }
 
 .config-list {
+    min-width: 0;
     min-height: 0;
-    overflow-y: auto;
+    overflow-x: auto;
+    overflow-y: scroll;
     padding-right: .25rem;
 }
 
 .config-editor {
-    overflow-y: auto;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
 }
 
 .config-browser-header,
@@ -167,9 +171,29 @@
 }
 
 .config-editor-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     border-bottom: 1px solid #2b343e;
     padding-bottom: 1rem;
     margin-bottom: 1rem;
+    background: #171d24;
+}
+
+.config-editor-heading {
+    min-width: 0;
+}
+
+.config-editor-message {
+    margin-top: .5rem;
+    font-size: .85rem;
+    line-height: 1.35;
+}
+
+.config-editor-content {
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: .25rem;
 }
 
 .config-editor-header h2 {
