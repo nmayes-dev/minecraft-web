@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Formats.Tar;
+using System.Runtime.InteropServices;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
@@ -212,6 +214,9 @@ public sealed class ModpackService(
                     await RestoreWorldAsync(target, selectedWorld, ct);
                 }
 
+                progress?.Report("Applying Minecraft file ownership…");
+                NormalizeMinecraftOwnership();
+
                 progress?.Report("Writing the selected modpack environment…");
                 await WriteEnvironmentAtomicallyAsync(target.Environment, ct);
 
@@ -390,6 +395,8 @@ public sealed class ModpackService(
                     TarFile.ExtractToDirectory(gzip, minecraftOptions_.DataPath, overwriteFiles: true);
                 }, ct);
             }
+
+            NormalizeMinecraftOwnership();
 
             await WriteEnvironmentAtomicallyAsync(previousEnvironmentText, ct);
             await docker.CreateContainerAsync(inspection, previousEnvironment.Keys.ToList(), previousEnvironment, ct);
@@ -747,6 +754,45 @@ public sealed class ModpackService(
             Directory.Delete(path, recursive: true);
     }
 
+    private void NormalizeMinecraftOwnership()
+    {
+        if (!OperatingSystem.IsLinux())
+            return;
+
+        var uid = managementOptions_.MinecraftUid;
+        var gid = managementOptions_.MinecraftGid;
+
+        if (uid < 0)
+            throw new InvalidOperationException("ServerManagement:MinecraftUid cannot be negative.");
+
+        if (gid < 0)
+            throw new InvalidOperationException("ServerManagement:MinecraftGid cannot be negative.");
+
+        var dataPath = minecraftOptions_.DataPath;
+        Directory.CreateDirectory(dataPath);
+
+        SetOwnership(dataPath, uid, gid);
+
+        foreach (var path in Directory.EnumerateFileSystemEntries(
+                     dataPath,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            SetOwnership(path, uid, gid);
+        }
+    }
+
+    private static void SetOwnership(string path, int uid, int gid)
+    {
+        if (NativeMethods.LChown(path, (uint)uid, (uint)gid) == 0)
+            return;
+
+        var error = Marshal.GetLastPInvokeError();
+        throw new IOException(
+            $"Failed to set ownership of '{path}' to {uid}:{gid}: " +
+            $"{new Win32Exception(error).Message} (errno {error}).");
+    }
+
     private static string FormatBytes(long bytes)
     {
         string[] units = ["B", "KB", "MB", "GB", "TB"];
@@ -758,6 +804,12 @@ public sealed class ModpackService(
             unit++;
         }
         return $"{value:0.##} {units[unit]}";
+    }
+
+    private static class NativeMethods
+    {
+        [DllImport("libc", EntryPoint = "lchown", SetLastError = true)]
+        internal static extern int LChown(string path, uint owner, uint group);
     }
 
     private sealed record ActiveModpackState(string ModpackId);
