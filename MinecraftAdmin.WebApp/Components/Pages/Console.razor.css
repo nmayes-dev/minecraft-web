@@ -1,14 +1,31 @@
-.console {
+.console-page {
     grid-template-rows: auto auto auto minmax(0, 1fr);
-}
-
-.console-form {
-    display: flex;
     gap: .75rem;
 }
 
-.console-form input {
-    flex: 1;
+.console-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.console-heading h1 {
+    margin: 0 0 .35rem;
+}
+
+.hint {
+    margin: 0;
+    color: #9ca9b6;
+}
+
+.console-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.console-actions select {
     background: #11161b;
     border: 1px solid #3a4652;
     color: white;
@@ -16,13 +33,30 @@
     padding: .55rem .65rem;
 }
 
+
+.console-form {
+    display: flex;
+    gap: .75rem;
+}
+
+    .console-form input {
+        flex: 1;
+        background: #11161b;
+        border: 1px solid #3a4652;
+        color: white;
+        border-radius: .4rem;
+        padding: .55rem .65rem;
+    }
+
+
 .console-output {
-    margin-top: 1rem;
+    min-height: 0;
+    margin: 0;
     padding: 1rem;
-    min-height: 300px;
     overflow: auto;
     background: #090c0f;
     border: 1px solid #2b343e;
     border-radius: .5rem;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }

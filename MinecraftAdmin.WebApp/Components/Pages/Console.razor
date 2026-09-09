@@ -1,53 +1,390 @@
 @page "/console"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject DockerService Docker
 @inject MinecraftService Minecraft
 
 <PageTitle>Console</PageTitle>
 
-<div class="app-page console">
-    <h1>Console</h1>
-    <p>Commands are sent through Minecraft RCON.</p>
+<div class="app-page console-page">
+    <div class="console-heading">
+        <h1>Console</h1>
 
-    <div class="console-form">
-        <input @bind="command_" @bind:event="oninput" @onkeydown="OnKeyDown" placeholder="list" />
-        <button @onclick="SendAsync" disabled="@sending_">Send</button>
+        <div class="console-actions">
+            <label for="tail">Lines</label>
+
+            <select id="tail"
+                    @bind="tail_"
+                    @bind:after="ResetDockerSnapshotAsync">
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+                <option value="2000">2000</option>
+            </select>
+
+            <button @onclick="RefreshAsync"
+                    disabled="@refreshing_">
+                Refresh
+            </button>
+        </div>
     </div>
 
-    <pre class="console-output">@string.Join(Environment.NewLine + Environment.NewLine, history_)</pre>
+    <div class="console-form">
+        <input @bind="command_"
+               @bind:event="oninput"
+               @onkeydown="OnKeyDown"
+               placeholder="list" />
+
+        <button @onclick="SendAsync"
+                disabled="@sending_">
+            Send
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(error_))
+    {
+        <div class="error">@error_</div>
+    }
+
+    <pre class="console-output"
+         @ref="logOutput_">@ConsoleText</pre>
 </div>
 
-
 @code {
+    private readonly CancellationTokenSource disposeCts_ = new();
+
+    private readonly List<string> consoleEntries_ = [];
+
+    private List<string> previousDockerLines_ = [];
+
+    private readonly List<string> history_ = [];
+    private int historyIndex_;
+
+    private string? error_;
+    private int tail_ = 500;
+    private bool refreshing_;
+
     private string command_ = string.Empty;
     private bool sending_;
-    private readonly List<string> history_ = [];
+
+    private ElementReference logOutput_;
+
+    private string ConsoleText =>
+        consoleEntries_.Count == 0
+            ? "No log output."
+            : string.Join(Environment.NewLine, consoleEntries_);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+
+        _ = RefreshLoopAsync(disposeCts_.Token);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync(
+            "scrollToBottom",
+            logOutput_);
+    }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
-            await SendAsync();
+        switch (e.Key)
+        {
+            case "ArrowUp":
+                HistoryUp();
+                break;
+
+            case "ArrowDown":
+                HistoryDown();
+                break;
+
+            case "Enter":
+                await SendAsync();
+                break;
+        }
+    }
+
+    private void HistoryUp()
+    {
+        if (history_.Count == 0)
+            return;
+
+        historyIndex_ = Math.Max(
+            0,
+            historyIndex_ - 1);
+
+        command_ = history_[historyIndex_];
+    }
+
+    private void HistoryDown()
+    {
+        if (history_.Count == 0)
+            return;
+
+        historyIndex_ = Math.Min(
+            history_.Count,
+            historyIndex_ + 1);
+
+        command_ = historyIndex_ == history_.Count
+            ? string.Empty
+            : history_[historyIndex_];
     }
 
     private async Task SendAsync()
     {
         var command = command_.Trim();
+
         if (command.Length == 0 || sending_)
             return;
 
         sending_ = true;
+
+        history_.Add(command);
+        historyIndex_ = history_.Count;
+
         command_ = string.Empty;
+
+        consoleEntries_.Add($"> {command}");
+
         try
         {
-            var response = await Minecraft.ExecuteCommandAsync(command);
-            history_.Insert(0, $"> {command}\n{response}");
+            var response =
+                await Minecraft.ExecuteCommandAsync(command);
+
+            if (!string.IsNullOrWhiteSpace(response))
+            {
+                consoleEntries_.Add(
+                    response.TrimEnd());
+            }
         }
         catch (Exception ex)
         {
-            history_.Insert(0, $"> {command}\nERROR: {ex.Message}");
+            consoleEntries_.Add(
+                $"ERROR: {ex.Message}");
         }
         finally
         {
             sending_ = false;
         }
+    }
+
+    private async Task RefreshLoopAsync(
+        CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(
+                    TimeSpan.FromSeconds(1),
+                    ct);
+
+                await InvokeAsync(async () =>
+                {
+                    await RefreshAsync();
+
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+            when (ct.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task ResetDockerSnapshotAsync()
+    {
+        previousDockerLines_ = [];
+
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (refreshing_ ||
+            disposeCts_.IsCancellationRequested)
+        {
+            return;
+        }
+
+        refreshing_ = true;
+
+        try
+        {
+            var logs =
+                await Docker.GetContainerLogsAsync(
+                    tail_,
+                    disposeCts_.Token);
+
+            var currentDockerLines =
+                SplitLines(logs);
+
+            if (previousDockerLines_.Count == 0)
+            {
+                consoleEntries_.AddRange(
+                    currentDockerLines);
+            }
+            else
+            {
+                AppendNewDockerLines(
+                    previousDockerLines_,
+                    currentDockerLines);
+            }
+
+            previousDockerLines_ =
+                currentDockerLines;
+
+            error_ = null;
+        }
+        catch (OperationCanceledException)
+            when (disposeCts_.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            error_ = ex.Message;
+        }
+        finally
+        {
+            refreshing_ = false;
+        }
+    }
+
+    private void AppendNewDockerLines(
+        IReadOnlyList<string> previous,
+        IReadOnlyList<string> current)
+    {
+        if (current.Count == 0)
+            return;
+
+        var overlap = FindOverlap(previous, current);
+
+        if (overlap == 0)
+        {
+            for (var previousIndex = previous.Count - 1;
+                 previousIndex >= 0;
+                 --previousIndex)
+            {
+                var currentIndex =
+                    LastIndexOf(
+                        current,
+                        previous[previousIndex]);
+
+                if (currentIndex < 0)
+                    continue;
+
+                for (var i = currentIndex + 1;
+                     i < current.Count;
+                     ++i)
+                {
+                    consoleEntries_.Add(
+                        current[i]);
+                }
+
+                return;
+            }
+
+            consoleEntries_.Add(
+                "----- Docker log stream restarted -----");
+
+            consoleEntries_.AddRange(
+                current);
+
+            return;
+        }
+
+        for (var i = overlap;
+             i < current.Count;
+             ++i)
+        {
+            consoleEntries_.Add(
+                current[i]);
+        }
+    }
+
+    private static List<string> SplitLines(
+        string logs)
+    {
+        if (string.IsNullOrEmpty(logs))
+            return [];
+
+        var lines = logs
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n')
+            .Split('\n')
+            .ToList();
+
+        if (lines.Count > 0 &&
+            lines[^1].Length == 0)
+        {
+            lines.RemoveAt(
+                lines.Count - 1);
+        }
+
+        return lines;
+    }
+
+    private static int FindOverlap(
+        IReadOnlyList<string> previous,
+        IReadOnlyList<string> current)
+    {
+        var maximumOverlap =
+            Math.Min(
+                previous.Count,
+                current.Count);
+
+        for (var overlap = maximumOverlap;
+             overlap > 0;
+             --overlap)
+        {
+            var matches = true;
+
+            for (var i = 0;
+                 i < overlap;
+                 ++i)
+            {
+                if (previous[
+                        previous.Count - overlap + i]
+                    == current[i])
+                {
+                    continue;
+                }
+
+                matches = false;
+                break;
+            }
+
+            if (matches)
+                return overlap;
+        }
+
+        return 0;
+    }
+
+    private static int LastIndexOf(
+        IReadOnlyList<string> values,
+        string value)
+    {
+        for (var i = values.Count - 1;
+             i >= 0;
+             --i)
+        {
+            if (values[i] == value)
+                return i;
+        }
+
+        return -1;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        disposeCts_.Cancel();
+        disposeCts_.Dispose();
+
+        return ValueTask.CompletedTask;
     }
 }
