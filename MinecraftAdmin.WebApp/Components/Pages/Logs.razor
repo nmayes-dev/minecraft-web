@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 @inject DockerService Docker
+@inject IJSRuntime JS
 
 <PageTitle>Server Logs</PageTitle>
 
@@ -28,7 +29,7 @@
         <div class="error">@error_</div>
     }
 
-    <pre class="logs-output">@(string.IsNullOrEmpty(logs_) ? "No log output." : logs_)</pre>
+    <pre class="logs-output" @ref="logOutput_">@(string.IsNullOrEmpty(logs_) ? "No log output." : logs_)</pre>
 </div>
 
 @code {
@@ -37,11 +38,17 @@
     private string? error_;
     private int tail_ = 500;
     private bool refreshing_;
+    private ElementReference logOutput_;
 
     protected override async Task OnInitializedAsync()
     {
         await RefreshAsync();
         _ = RefreshLoopAsync(disposeCts_.Token);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JS.InvokeVoidAsync("scrollToBottom", logOutput_);
     }
 
     private async Task RefreshLoopAsync(CancellationToken ct)
