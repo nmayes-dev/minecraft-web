@@ -1,0 +1,250 @@
+@page "/modpacks"
+@rendermode InteractiveServer
+@inject ModpackService ModpackService
+@inject NavigationManager Navigation
+
+<PageTitle>Modpacks - Minecraft Admin</PageTitle>
+
+<div class="app-page modpack-page">
+    <div class="page-heading">
+        <div>
+            <h1>Modpacks</h1>
+            <p class="hint">Choose an uploaded server pack and either start a new world or restore one previously saved for that pack.</p>
+        </div>
+        <button @onclick="OpenUpload" disabled="@switching_">Upload modpack</button>
+    </div>
+
+    @if (loading_)
+    {
+        <p>Loading…</p>
+    }
+    else if (library_.Modpacks.Count == 0)
+    {
+        <section class="panel empty-panel">
+            <h2>No modpacks uploaded</h2>
+            <p class="hint">Upload a server pack ZIP and its Minecraft environment settings before switching.</p>
+            <button @onclick="OpenUpload">Upload modpack</button>
+        </section>
+    }
+    else
+    {
+        <section class="panel modpack-panel">
+            <div class="current-pack">
+                <span>Current modpack</span>
+                <strong>@ActiveModpackName</strong>
+            </div>
+
+            @if (library_.ActiveModpackId is null)
+            {
+                <p class="warning-text">
+                    The current server is not associated with an uploaded modpack. A full backup will still be written to /old on the first switch,
+                    but a selectable world snapshot can only be attached when the current environment matches an uploaded pack.
+                </p>
+            }
+
+            <label for="modpack">Modpack</label>
+            <select id="modpack" @bind="selectedModpackId_" @bind:after="OnModpackChanged" disabled="@switching_">
+                @foreach (var modpack in library_.Modpacks)
+                {
+                    <option value="@modpack.Id">@modpack.Name</option>
+                }
+            </select>
+
+            @if (SelectedModpack is { } selected)
+            {
+                <div class="pack-details">
+                    <span><strong>Server pack:</strong> @selected.OriginalFileName</span>
+                    <span><strong>Uploaded:</strong> @selected.UploadedAtUtc.ToLocalTime().ToString("g")</span>
+                </div>
+
+                <label for="environment">Environment</label>
+                <textarea id="environment" readonly>@selected.Environment</textarea>
+
+                <label for="world">World</label>
+                <select id="world" @bind="selectedWorldId_" disabled="@switching_">
+                    <option value="">Create a new world</option>
+                    @foreach (var world in selected.Worlds.OrderByDescending(world => world.CreatedAtUtc))
+                    {
+                        <option value="@world.Id">
+                            Restore @world.CreatedAtUtc.ToLocalTime().ToString("g") (@FormatBytes(world.SizeBytes))
+                        </option>
+                    }
+                </select>
+
+                @if (selected.Worlds.Count == 0)
+                {
+                    <p class="hint">No previously saved worlds are available for this modpack yet.</p>
+                }
+            }
+        </section>
+
+        <section class="panel modpack-panel switch-panel">
+            <h2>Switch server</h2>
+            <p class="hint">
+                The current server is stopped and fully backed up first. Its current world is also saved against its modpack.
+                The selected server-pack ZIP is then extracted and the chosen world is restored, or a new world is created.
+            </p>
+
+            @if (!confirming_)
+            {
+                <button class="danger change-button" @onclick="BeginConfirmation" disabled="@(switching_ || SelectedModpack is null)">
+                    Switch modpack
+                </button>
+            }
+            else
+            {
+                <div class="confirmation">
+                    <strong>Confirm server replacement</strong>
+                    <span>@ConfirmationText</span>
+                    <div class="confirmation-actions">
+                        <button class="danger" @onclick="SwitchAsync" disabled="@switching_">Confirm</button>
+                        <button @onclick="CancelConfirmation" disabled="@switching_">Cancel</button>
+                    </div>
+                </div>
+            }
+        </section>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(progressMessage_))
+    {
+        <p class="status-message">
+            @if (switching_)
+            {
+                <span class="spinner" aria-hidden="true"></span>
+            }
+            <span>@progressMessage_</span>
+        </p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(error_))
+    {
+        <div class="error">@error_</div>
+    }
+</div>
+
+@code {
+    private bool loading_ = true;
+    private bool switching_;
+    private bool confirming_;
+    private string selectedModpackId_ = string.Empty;
+    private string selectedWorldId_ = string.Empty;
+    private string? progressMessage_;
+    private string? error_;
+    private ModpackLibraryState library_ = new([], null);
+
+    private ModpackDefinition? SelectedModpack =>
+        library_.Modpacks.FirstOrDefault(modpack => modpack.Id == selectedModpackId_);
+
+    private string ActiveModpackName =>
+        library_.Modpacks.FirstOrDefault(modpack => modpack.Id == library_.ActiveModpackId)?.Name ?? "Unmanaged / unknown";
+
+    private string ConfirmationText
+    {
+        get
+        {
+            if (SelectedModpack is not { } selected)
+                return string.Empty;
+
+            var world = selected.Worlds.FirstOrDefault(item => item.Id == selectedWorldId_);
+            return world is null
+                ? $"{selected.Name} will be installed with a new world."
+                : $"{selected.Name} will be installed and its world from {world.CreatedAtUtc.ToLocalTime():g} will be restored.";
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        loading_ = true;
+        error_ = null;
+
+        try
+        {
+            library_ = await ModpackService.GetLibraryAsync();
+
+            if (library_.Modpacks.Count > 0 && !library_.Modpacks.Any(modpack => modpack.Id == selectedModpackId_))
+                selectedModpackId_ = library_.ActiveModpackId ?? library_.Modpacks[0].Id;
+
+            selectedWorldId_ = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            error_ = ex.Message;
+        }
+        finally
+        {
+            loading_ = false;
+        }
+    }
+
+    private void OnModpackChanged()
+    {
+        selectedWorldId_ = string.Empty;
+        confirming_ = false;
+        error_ = null;
+        progressMessage_ = null;
+    }
+
+    private void OpenUpload() => Navigation.NavigateTo("/modpacks/upload");
+
+    private void BeginConfirmation()
+    {
+        error_ = null;
+        progressMessage_ = null;
+        confirming_ = true;
+    }
+
+    private void CancelConfirmation() => confirming_ = false;
+
+    private async Task SwitchAsync()
+    {
+        if (switching_ || SelectedModpack is null)
+            return;
+
+        switching_ = true;
+        confirming_ = false;
+        error_ = null;
+        progressMessage_ = "Starting modpack change…";
+
+        var progress = new Progress<string>(message =>
+        {
+            progressMessage_ = message;
+            _ = InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            var result = await ModpackService.SwitchAsync(
+                new ModpackSwitchRequest(
+                    selectedModpackId_,
+                    string.IsNullOrWhiteSpace(selectedWorldId_) ? null : selectedWorldId_),
+                progress);
+
+            await ReloadAsync();
+            progressMessage_ = $"{result.Message} Full backup: {Path.GetFileName(result.BackupArchiveFile)}";
+        }
+        catch (Exception ex)
+        {
+            error_ = ex.Message;
+            progressMessage_ = null;
+        }
+        finally
+        {
+            switching_ = false;
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var value = (double)bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+        return $"{value:0.##} {units[unit]}";
+    }
+}

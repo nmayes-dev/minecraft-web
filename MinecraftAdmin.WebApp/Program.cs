@@ -8,9 +8,12 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.Configure<MinecraftOptions>(builder.Configuration.GetSection("Minecraft"));
+builder.Services.Configure<ServerManagementOptions>(builder.Configuration.GetSection("ServerManagement"));
 builder.Services.AddSingleton<RconClient>();
 builder.Services.AddSingleton<ConfigurationService>();
 builder.Services.AddSingleton<MinecraftService>();
+builder.Services.AddSingleton<DockerService>();
+builder.Services.AddSingleton<ModpackService>();
 
 var app = builder.Build();
 
@@ -44,6 +47,15 @@ api.MapPost("/server/restart", async (MinecraftService minecraft, CancellationTo
     await minecraft.RestartAsync(ct);
     return Results.Accepted();
 });
+
+api.MapGet("/modpack", async (ModpackService modpacks, CancellationToken ct) =>
+    Results.Ok(await modpacks.GetConfigurationAsync(ct)));
+
+api.MapGet("/modpacks", async (ModpackService modpacks, CancellationToken ct) =>
+    Results.Ok(await modpacks.GetLibraryAsync(ct)));
+
+api.MapPost("/modpack/switch", async (ModpackSwitchRequest request, ModpackService modpacks, CancellationToken ct) =>
+    Results.Ok(await modpacks.SwitchAsync(request, ct: ct)));
 
 api.MapGet("/config/files", async (ConfigurationService configuration, CancellationToken ct) =>
     Results.Ok(await configuration.GetFilesAsync(ct)));

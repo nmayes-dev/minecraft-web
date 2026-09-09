@@ -1,0 +1,124 @@
+.modpack-page {
+    overflow-y: auto;
+}
+
+.page-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.page-heading h1 {
+    margin-bottom: .35rem;
+}
+
+.modpack-panel {
+    display: grid;
+    gap: .75rem;
+}
+
+.modpack-panel h2,
+.empty-panel h2 {
+    margin: 0;
+}
+
+.hint {
+    margin: 0;
+    color: #9ca9b6;
+    max-width: 70rem;
+}
+
+.warning-text {
+    margin: 0;
+    padding: .75rem;
+    border: 1px solid #6f5c32;
+    border-radius: .45rem;
+    background: #292315;
+    color: #e6d39e;
+}
+
+.current-pack {
+    display: flex;
+    align-items: baseline;
+    gap: .55rem;
+}
+
+.current-pack span {
+    color: #9ca9b6;
+}
+
+label {
+    font-weight: 600;
+}
+
+textarea,
+select {
+    width: 100%;
+    border: 1px solid #3b4856;
+    background: #101419;
+    color: #e9eef4;
+    border-radius: .45rem;
+    padding: .65rem .75rem;
+}
+
+textarea {
+    min-height: 10rem;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    line-height: 1.45;
+}
+
+textarea[readonly] {
+    color: #cbd5df;
+}
+
+.pack-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+    color: #b8c2cc;
+}
+
+.change-button {
+    justify-self: start;
+    margin-top: .25rem;
+}
+
+.confirmation {
+    display: grid;
+    gap: .55rem;
+    padding: .9rem;
+    border: 1px solid #744;
+    border-radius: .55rem;
+    background: #26191b;
+}
+
+.confirmation-actions {
+    display: flex;
+    gap: .65rem;
+    margin-top: .25rem;
+}
+
+.status-message {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    margin: .25rem 0 0;
+}
+
+.spinner {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin .75s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

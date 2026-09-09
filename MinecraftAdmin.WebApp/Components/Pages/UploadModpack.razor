@@ -1,0 +1,129 @@
+@page "/modpacks/upload"
+@rendermode InteractiveServer
+@inject ModpackService ModpackService
+@inject NavigationManager Navigation
+
+<PageTitle>Upload Modpack - Minecraft Admin</PageTitle>
+
+<div class="app-page upload-modpack-page">
+    <div class="page-heading">
+        <div>
+            <h1>Upload modpack</h1>
+            <p class="hint">Add a reusable server pack to the modpack library.</p>
+        </div>
+        <button @onclick="Back" disabled="@uploading_">Back</button>
+    </div>
+
+    <section class="panel upload-panel">
+        <label for="name">Name</label>
+        <input id="name"
+               type="text"
+               placeholder="Create Astral"
+               @bind="name_"
+               disabled="@uploading_" />
+
+        <label for="environment">Minecraft environment</label>
+        <p class="hint">
+            Enter the environment variables specific to this pack. Common Compose settings such as RCON and memory do not need to be repeated.
+        </p>
+        <textarea id="environment"
+                  spellcheck="false"
+                  placeholder=@($"TYPE=FABRIC{Environment.NewLine}VERSION=1.18.2{Environment.NewLine}FABRIC_LOADER_VERSION=0.18.4")
+                  @bind="environment_"
+                  disabled="@uploading_"></textarea>
+
+        <label>Server pack ZIP</label>
+        <InputFile OnChange="OnFileSelected" accept=".zip,application/zip" disabled="@uploading_" />
+
+        @if (selectedFile_ is not null)
+        {
+            <div class="file-summary">
+                <strong>@selectedFile_.Name</strong>
+                <span>@FormatBytes(selectedFile_.Size)</span>
+            </div>
+        }
+
+        <button @onclick="UploadAsync" disabled="@(uploading_ || selectedFile_ is null)">
+            @if (uploading_)
+            {
+                <span class="spinner" aria-hidden="true"></span>
+                <span>Uploading…</span>
+            }
+            else
+            {
+                <span>Save modpack</span>
+            }
+        </button>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(status_))
+    {
+        <p class="status-message">@status_</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(error_))
+    {
+        <div class="error">@error_</div>
+    }
+</div>
+
+@code {
+    private string name_ = string.Empty;
+    private string environment_ = string.Empty;
+    private IBrowserFile? selectedFile_;
+    private bool uploading_;
+    private string? status_;
+    private string? error_;
+
+    private void OnFileSelected(InputFileChangeEventArgs args)
+    {
+        selectedFile_ = args.File;
+        error_ = null;
+        status_ = null;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (uploading_ || selectedFile_ is null)
+            return;
+
+        uploading_ = true;
+        error_ = null;
+        status_ = "Uploading and validating server pack…";
+
+        try
+        {
+            await using var stream = selectedFile_.OpenReadStream(ModpackService.MaxUploadBytes);
+            var modpack = await ModpackService.UploadAsync(
+                new ModpackUploadRequest(name_, environment_),
+                stream,
+                selectedFile_.Name);
+
+            Navigation.NavigateTo("/modpacks");
+        }
+        catch (Exception ex)
+        {
+            error_ = ex.Message;
+            status_ = null;
+        }
+        finally
+        {
+            uploading_ = false;
+        }
+    }
+
+    private void Back() => Navigation.NavigateTo("/modpacks");
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var value = (double)bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+        return $"{value:0.##} {units[unit]}";
+    }
+}

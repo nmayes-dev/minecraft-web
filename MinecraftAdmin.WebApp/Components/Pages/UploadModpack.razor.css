@@ -1,0 +1,79 @@
+.upload-modpack-page {
+    overflow-y: auto;
+}
+
+.page-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.page-heading h1 {
+    margin-bottom: .35rem;
+}
+
+.hint {
+    margin: 0;
+    color: #9ca9b6;
+    max-width: 70rem;
+}
+
+.upload-panel {
+    display: grid;
+    gap: .75rem;
+}
+
+label {
+    font-weight: 600;
+}
+
+textarea,
+input[type="text"] {
+    width: 100%;
+    border: 1px solid #3b4856;
+    background: #101419;
+    color: #e9eef4;
+    border-radius: .45rem;
+    padding: .65rem .75rem;
+}
+
+textarea {
+    min-height: 16rem;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    line-height: 1.45;
+}
+
+.file-summary {
+    display: flex;
+    gap: .75rem;
+    color: #b8c2cc;
+}
+
+.upload-panel button {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.status-message {
+    margin: .25rem 0 0;
+}
+
+.spinner {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin .75s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
