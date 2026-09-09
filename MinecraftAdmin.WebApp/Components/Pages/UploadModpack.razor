@@ -1,7 +1,9 @@
 @page "/modpacks/upload"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @using System.Diagnostics
-@inject ModpackService ModpackService
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 @inject NavigationManager Navigation
 
 <PageTitle>Upload Modpack</PageTitle>
@@ -9,7 +11,7 @@
 <div class="app-page upload-modpack-page">
     <div class="page-heading">
         <div>
-            <h1>Upload modpack</h1>
+            <h1>Upload Modpack</h1>
             <p class="hint">Add a reusable server pack to the modpack library.</p>
         </div>
         <button @onclick="Back" disabled="@uploading_">Back</button>
@@ -25,7 +27,7 @@
 
         <label for="environment">Minecraft environment</label>
         <p class="hint">
-            Enter the environment variables specific to this pack. Common Compose settings such as RCON and memory do not need to be repeated.
+            Enter the environment variables specific to this pack, e.g. forge version.
         </p>
         <textarea id="environment"
                   spellcheck="false"
@@ -33,8 +35,13 @@
                   @bind="environment_"
                   disabled="@uploading_"></textarea>
 
-        <label>Server pack ZIP</label>
-        <InputFile OnChange="OnFileSelected" accept=".zip,application/zip" disabled="@uploading_" />
+        <label for="server-pack">Server pack ZIP</label>
+        <input id="server-pack"
+               @ref="fileInput_"
+               type="file"
+               accept=".zip,application/zip"
+               @onchange="OnFileSelectedAsync"
+               disabled="@uploading_" />
 
         @if (selectedFile_ is not null)
         {
@@ -63,17 +70,34 @@
             </div>
         }
 
-        <button @onclick="UploadAsync" disabled="@(uploading_ || selectedFile_ is null)">
+        <div class="upload-actions">
+            <button @onclick="UploadAsync" disabled="@(uploading_ || selectedFile_ is null)">
+                @if (uploading_ && !cancelling_)
+                {
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span>Uploading…</span>
+                }
+                else
+                {
+                    <span>Upload</span>
+                }
+            </button>
+
             @if (uploading_)
             {
-                <span class="spinner" aria-hidden="true"></span>
-                <span>Uploading…</span>
+                <button class="cancel-button" @onclick="CancelUploadAsync" disabled="@cancelling_">
+                    @if (cancelling_)
+                    {
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span>Cancelling…</span>
+                    }
+                    else
+                    {
+                        <span>Cancel</span>
+                    }
+                </button>
             }
-            else
-            {
-                <span>Save modpack</span>
-            }
-        </button>
+        </div>
     </section>
 
     @if (!string.IsNullOrWhiteSpace(status_))
@@ -88,10 +112,16 @@
 </div>
 
 @code {
+    private sealed record BrowserFileInfo(string Name, long Size);
+
     private string name_ = string.Empty;
     private string environment_ = string.Empty;
-    private IBrowserFile? selectedFile_;
+    private BrowserFileInfo? selectedFile_;
+    private ElementReference fileInput_;
+    private DotNetObjectReference<UploadModpack>? dotNetReference_;
+    private string? uploadId_;
     private bool uploading_;
+    private bool cancelling_;
     private string? status_;
     private string? error_;
     private long uploadTransferred_;
@@ -109,26 +139,29 @@
     {
         get
         {
+            if (uploadTransferred_ >= uploadTotal_ && uploadTotal_ > 0)
+                return "Upload sent. Validating and saving modpack…";
+
             var elapsed = uploadStopwatch_.Elapsed;
             if (uploadTransferred_ <= 0 || elapsed.TotalSeconds <= 0.1)
                 return $"Elapsed {FormatDuration(elapsed)}";
 
             var bytesPerSecond = uploadTransferred_ / elapsed.TotalSeconds;
-            if (uploadTransferred_ < uploadTotal_ && bytesPerSecond > 0)
+            if (bytesPerSecond > 0)
             {
                 var remaining = TimeSpan.FromSeconds((uploadTotal_ - uploadTransferred_) / bytesPerSecond);
-                return $"Elapsed {FormatDuration(elapsed)} · About {FormatDuration(remaining)} remaining";
+                return $"{FormatRate(bytesPerSecond)} · Elapsed {FormatDuration(elapsed)} · About {FormatDuration(remaining)} remaining";
             }
 
-            return $"Uploaded in {FormatDuration(elapsed)}";
+            return $"Elapsed {FormatDuration(elapsed)}";
         }
     }
 
-    private void OnFileSelected(InputFileChangeEventArgs args)
+    private async Task OnFileSelectedAsync()
     {
-        selectedFile_ = args.File;
+        selectedFile_ = await JS.InvokeAsync<BrowserFileInfo?>("modpackUpload.getFileInfo", fileInput_);
         uploadTransferred_ = 0;
-        uploadTotal_ = selectedFile_.Size;
+        uploadTotal_ = selectedFile_?.Size ?? 0;
         uploadStopwatch_.Reset();
         error_ = null;
         status_ = null;
@@ -140,50 +173,145 @@
             return;
 
         uploading_ = true;
+        cancelling_ = false;
         uploadTransferred_ = 0;
         uploadTotal_ = selectedFile_.Size;
         uploadStopwatch_.Restart();
         error_ = null;
         status_ = "Uploading server pack…";
+        uploadId_ = Guid.NewGuid().ToString("N");
+        dotNetReference_ ??= DotNetObjectReference.Create(this);
 
         try
         {
-            var progress = new Progress<ModpackUploadProgress>(OnUploadProgress);
-            await using var stream = selectedFile_.OpenReadStream(ModpackService.MaxUploadBytes);
-            await ModpackService.UploadAsync(
-                new ModpackUploadRequest(name_, environment_),
-                stream,
-                selectedFile_.Name,
-                selectedFile_.Size,
-                progress);
-
-            uploadStopwatch_.Stop();
-            Navigation.NavigateTo("/modpacks");
+            await JS.InvokeVoidAsync(
+                "modpackUpload.start",
+                uploadId_,
+                fileInput_,
+                name_,
+                environment_,
+                dotNetReference_);
         }
         catch (Exception ex)
         {
             uploadStopwatch_.Stop();
+            uploading_ = false;
+            uploadId_ = null;
             error_ = ex.Message;
             status_ = null;
         }
-        finally
+    }
+
+    private async Task CancelUploadAsync()
+    {
+        if (!uploading_ || string.IsNullOrWhiteSpace(uploadId_) || cancelling_)
+            return;
+
+        cancelling_ = true;
+        status_ = "Cancelling upload…";
+
+        try
         {
-            uploading_ = false;
+            await JS.InvokeVoidAsync("modpackUpload.cancel", uploadId_, true);
+        }
+        catch (Exception ex)
+        {
+            cancelling_ = false;
+            error_ = ex.Message;
         }
     }
 
-    private void OnUploadProgress(ModpackUploadProgress progress)
+    [JSInvokable]
+    public Task OnUploadProgress(long bytesTransferred, long totalBytes)
     {
-        uploadTransferred_ = progress.BytesTransferred;
-        uploadTotal_ = progress.TotalBytes;
+        uploadTransferred_ = bytesTransferred;
+        uploadTotal_ = totalBytes;
+        status_ = uploadTransferred_ >= uploadTotal_ && uploadTotal_ > 0
+            ? "Upload sent. Validating and saving modpack…"
+            : "Uploading server pack…";
 
-        if (uploadTotal_ > 0 && uploadTransferred_ >= uploadTotal_)
-            status_ = "Upload complete. Validating and saving modpack…";
+        return InvokeAsync(StateHasChanged);
+    }
 
-        _ = InvokeAsync(StateHasChanged);
+    [JSInvokable]
+    public Task OnUploadCompleted(int statusCode, string responseText)
+    {
+        uploadStopwatch_.Stop();
+        uploading_ = false;
+        cancelling_ = false;
+        uploadId_ = null;
+
+        if (statusCode is >= 200 and < 300)
+        {
+            Navigation.NavigateTo("/modpacks");
+            return Task.CompletedTask;
+        }
+
+        error_ = GetErrorMessage(responseText, $"Upload failed with HTTP {statusCode}.");
+        status_ = null;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnUploadFailed(string message)
+    {
+        uploadStopwatch_.Stop();
+        uploading_ = false;
+        cancelling_ = false;
+        uploadId_ = null;
+        error_ = message;
+        status_ = null;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnUploadCancelled()
+    {
+        uploadStopwatch_.Stop();
+        uploading_ = false;
+        cancelling_ = false;
+        uploadId_ = null;
+        uploadTransferred_ = 0;
+        status_ = "Upload cancelled.";
+        error_ = null;
+        return InvokeAsync(StateHasChanged);
     }
 
     private void Back() => Navigation.NavigateTo("/modpacks");
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(uploadId_))
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("modpackUpload.cancel", uploadId_, false);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        dotNetReference_?.Dispose();
+    }
+
+    private static string GetErrorMessage(string responseText, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(responseText))
+            return fallback;
+
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(responseText);
+            if (document.RootElement.TryGetProperty("error", out var error) && error.ValueKind == System.Text.Json.JsonValueKind.String)
+                return error.GetString() ?? fallback;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+        }
+
+        return fallback;
+    }
 
     private static string FormatBytes(long bytes)
     {
@@ -197,6 +325,8 @@
         }
         return $"{value:0.##} {units[unit]}";
     }
+
+    private static string FormatRate(double bytesPerSecond) => $"{FormatBytes((long)bytesPerSecond)}/s";
 
     private static string FormatDuration(TimeSpan duration)
     {

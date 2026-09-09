@@ -113,7 +113,7 @@ public sealed class ModpackService(
             {
                 var zipPath = Path.Combine(temporaryDirectory, ServerPackFileName);
                 await SaveUploadAsync(serverPack, zipPath, totalBytes, progress, ct);
-                ValidateZip(zipPath);
+                ValidateZip(zipPath, ct);
 
                 var modpack = new ModpackDefinition
                 {
@@ -514,10 +514,13 @@ public sealed class ModpackService(
         if (transferred == 0)
             throw new InvalidOperationException("The uploaded ZIP is empty.");
 
+        if (totalBytes > 0 && transferred != totalBytes)
+            throw new InvalidOperationException("The upload ended before the entire ZIP was received.");
+
         progress?.Report(new ModpackUploadProgress(transferred, totalBytes));
     }
 
-    private static void ValidateZip(string path)
+    private static void ValidateZip(string path, CancellationToken ct)
     {
         try
         {
@@ -526,7 +529,10 @@ public sealed class ModpackService(
                 throw new InvalidOperationException("The uploaded ZIP contains no files.");
 
             foreach (var entry in archive.Entries)
+            {
+                ct.ThrowIfCancellationRequested();
                 ValidateArchiveEntryPath(entry.FullName);
+            }
         }
         catch (InvalidDataException ex)
         {

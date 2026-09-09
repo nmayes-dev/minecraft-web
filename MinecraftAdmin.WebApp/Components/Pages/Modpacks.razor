@@ -11,7 +11,9 @@
             <h1>Modpacks</h1>
             <p class="hint">Choose an uploaded server pack and either start a new world or restore one previously saved for that pack.</p>
         </div>
-        <button @onclick="OpenUpload" disabled="@switching_">Upload modpack</button>
+        <div class="page-heading-upload">
+            <button @onclick="OpenUpload" disabled="@switching_">Upload</button>
+        </div>
     </div>
 
     @if (loading_)
@@ -30,14 +32,14 @@
     {
         <section class="panel modpack-panel">
             <div class="current-pack">
-                <span>Current modpack</span>
+                <span>Current Modpack</span>
                 <strong>@ActiveModpackName</strong>
             </div>
 
             @if (library_.ActiveModpackId is null)
             {
                 <p class="warning-text">
-                    The current server is not associated with an uploaded modpack. A full backup will still be written to /old on the first switch,
+                    The current server is not associated with an uploaded modpack. A full backup will still be saved on the first switch,
                     but a selectable world snapshot can only be attached when the current environment matches an uploaded pack.
                 </p>
             }
@@ -79,7 +81,7 @@
         </section>
 
         <section class="panel modpack-panel switch-panel">
-            <h2>Switch server</h2>
+            <h2>Switch Server</h2>
             <p class="hint">
                 The current server is stopped and fully backed up first. Its current world is also saved against its modpack.
                 The selected server-pack ZIP is then extracted and the chosen world is restored, or a new world is created.
@@ -88,13 +90,13 @@
             @if (!confirming_)
             {
                 <button class="danger change-button" @onclick="BeginConfirmation" disabled="@(switching_ || SelectedModpack is null)">
-                    Switch modpack
+                    Switch
                 </button>
             }
             else
             {
                 <div class="confirmation">
-                    <strong>Confirm server replacement</strong>
+                    <strong>Are you sure?</strong>
                     <span>@ConfirmationText</span>
                     <div class="confirmation-actions">
                         <button class="danger" @onclick="SwitchAsync" disabled="@switching_">Confirm</button>

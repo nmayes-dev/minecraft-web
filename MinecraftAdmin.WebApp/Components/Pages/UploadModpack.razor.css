@@ -88,11 +88,20 @@ textarea {
     font-variant-numeric: tabular-nums;
 }
 
-.upload-panel button {
-    justify-self: start;
+.upload-actions {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.upload-actions button {
     display: inline-flex;
     align-items: center;
     gap: .5rem;
+}
+
+.cancel-button {
+    border-color: #7b3a3a;
 }
 
 .status-message {
