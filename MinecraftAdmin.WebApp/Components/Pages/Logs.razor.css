@@ -1,0 +1,46 @@
+.logs-page {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: .75rem;
+}
+
+.logs-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.logs-heading h1 {
+    margin: 0 0 .35rem;
+}
+
+.hint {
+    margin: 0;
+    color: #9ca9b6;
+}
+
+.logs-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.logs-actions select {
+    background: #11161b;
+    border: 1px solid #3a4652;
+    color: white;
+    border-radius: .4rem;
+    padding: .55rem .65rem;
+}
+
+.logs-output {
+    min-height: 0;
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    background: #090c0f;
+    border: 1px solid #2b343e;
+    border-radius: .5rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

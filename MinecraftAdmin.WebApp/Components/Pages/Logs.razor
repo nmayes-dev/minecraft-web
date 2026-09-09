@@ -1,0 +1,92 @@
+@page "/logs"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject DockerService Docker
+
+<PageTitle>Server Logs</PageTitle>
+
+<div class="app-page logs-page">
+    <div class="logs-heading">
+        <div>
+            <h1>Server Logs</h1>
+            <p class="hint">Live output from the Minecraft Docker container. Refreshes automatically.</p>
+        </div>
+        <div class="logs-actions">
+            <label for="tail">Lines</label>
+            <select id="tail" @bind="tail_" @bind:after="RefreshAsync">
+                <option value="200">200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+                <option value="2000">2000</option>
+            </select>
+            <button @onclick="RefreshAsync" disabled="@refreshing_">Refresh</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(error_))
+    {
+        <div class="error">@error_</div>
+    }
+
+    <pre class="logs-output">@(string.IsNullOrEmpty(logs_) ? "No log output." : logs_)</pre>
+</div>
+
+@code {
+    private readonly CancellationTokenSource disposeCts_ = new();
+    private string logs_ = string.Empty;
+    private string? error_;
+    private int tail_ = 500;
+    private bool refreshing_;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+        _ = RefreshLoopAsync(disposeCts_.Token);
+    }
+
+    private async Task RefreshLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                await InvokeAsync(RefreshAsync);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (refreshing_ || disposeCts_.IsCancellationRequested)
+            return;
+
+        refreshing_ = true;
+        try
+        {
+            logs_ = await Docker.GetContainerLogsAsync(tail_, disposeCts_.Token);
+            error_ = null;
+        }
+        catch (OperationCanceledException) when (disposeCts_.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            error_ = ex.Message;
+        }
+        finally
+        {
+            refreshing_ = false;
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        disposeCts_.Cancel();
+        disposeCts_.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

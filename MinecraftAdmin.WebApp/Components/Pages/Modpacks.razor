@@ -45,12 +45,15 @@
             }
 
             <label for="modpack">Modpack</label>
-            <select id="modpack" @bind="selectedModpackId_" @bind:after="OnModpackChanged" disabled="@switching_">
-                @foreach (var modpack in library_.Modpacks)
-                {
-                    <option value="@modpack.Id">@modpack.Name</option>
-                }
-            </select>
+            <div class="modpack-edit">
+                <select id="modpack" @bind="selectedModpackId_" @bind:after="OnModpackChanged" disabled="@switching_">
+                    @foreach (var modpack in library_.Modpacks)
+                    {
+                        <option value="@modpack.Id">@modpack.Name</option>
+                    }
+                </select>
+                <button class="edit-button" @onclick="OpenEdit" disabled="@(switching_ || SelectedModpack is null)">Edit</button>
+            </div>
 
             @if (SelectedModpack is { } selected)
             {
@@ -58,9 +61,6 @@
                     <span><strong>Server pack:</strong> @selected.OriginalFileName</span>
                     <span><strong>Uploaded:</strong> @selected.UploadedAtUtc.ToLocalTime().ToString("g")</span>
                 </div>
-
-                <label for="environment">Environment</label>
-                <textarea id="environment" readonly>@selected.Environment</textarea>
 
                 <label for="world">World</label>
                 <select id="world" @bind="selectedWorldId_" disabled="@switching_">
@@ -189,6 +189,12 @@
     }
 
     private void OpenUpload() => Navigation.NavigateTo("/modpacks/upload");
+
+    private void OpenEdit()
+    {
+        if (SelectedModpack is { } selected)
+            Navigation.NavigateTo($"/modpacks/{Uri.EscapeDataString(selected.Id)}/edit");
+    }
 
     private void BeginConfirmation()
     {

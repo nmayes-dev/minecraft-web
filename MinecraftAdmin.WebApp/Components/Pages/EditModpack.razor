@@ -1,0 +1,113 @@
+@page "/modpacks/{ModpackId}/edit"
+@rendermode InteractiveServer
+@inject ModpackService ModpackService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit Modpack</PageTitle>
+
+<div class="app-page edit-modpack-page">
+    <div class="page-heading">
+        <div>
+            <h1>Edit Modpack</h1>
+            <p class="hint">Edit the stored settings used the next time this modpack is installed.</p>
+        </div>
+        <button @onclick="Back" disabled="@saving_">Back</button>
+    </div>
+
+    @if (loading_)
+    {
+        <p>Loading…</p>
+    }
+    else if (modpack_ is not null)
+    {
+        <section class="panel edit-panel">
+            <label for="name">Name</label>
+            <input id="name" @bind="name_" disabled="@saving_" />
+
+            <div class="pack-details">
+                <span><strong>Server pack:</strong> @modpack_.OriginalFileName</span>
+                <span><strong>Uploaded:</strong> @modpack_.UploadedAtUtc.ToLocalTime().ToString("g")</span>
+            </div>
+
+            <label for="environment">Environment</label>
+            <p class="hint">One <code>KEY=value</code> entry per line. These values are applied when switching to this pack.</p>
+            <textarea id="environment" @bind="environment_" disabled="@saving_"></textarea>
+
+            <div class="actions">
+                <button @onclick="SaveAsync" disabled="@saving_">@(saving_ ? "Saving…" : "Save")</button>
+                <button @onclick="Back" disabled="@saving_">Cancel</button>
+            </div>
+        </section>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(message_))
+    {
+        <p class="status-message">@message_</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(error_))
+    {
+        <div class="error">@error_</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string ModpackId { get; set; } = string.Empty;
+
+    private bool loading_ = true;
+    private bool saving_;
+    private ModpackDefinition? modpack_;
+    private string name_ = string.Empty;
+    private string environment_ = string.Empty;
+    private string? message_;
+    private string? error_;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading_ = true;
+        error_ = null;
+
+        try
+        {
+            modpack_ = await ModpackService.GetModpackAsync(ModpackId);
+            name_ = modpack_.Name;
+            environment_ = modpack_.Environment;
+        }
+        catch (Exception ex)
+        {
+            error_ = ex.Message;
+        }
+        finally
+        {
+            loading_ = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (saving_ || modpack_ is null)
+            return;
+
+        saving_ = true;
+        error_ = null;
+        message_ = null;
+
+        try
+        {
+            modpack_ = await ModpackService.UpdateAsync(ModpackId, new ModpackUpdateRequest(name_, environment_));
+            name_ = modpack_.Name;
+            environment_ = modpack_.Environment;
+            message_ = "Modpack saved.";
+        }
+        catch (Exception ex)
+        {
+            error_ = ex.Message;
+        }
+        finally
+        {
+            saving_ = false;
+        }
+    }
+
+    private void Back() => Navigation.NavigateTo("/modpacks");
+}

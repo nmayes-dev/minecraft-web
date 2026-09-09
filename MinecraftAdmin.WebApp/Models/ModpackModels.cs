@@ -24,6 +24,8 @@ public sealed class ModpackWorldArchive
 
 public sealed record ModpackUploadRequest(string Name, string Environment);
 
+public sealed record ModpackUpdateRequest(string Name, string Environment);
+
 public sealed record ModpackUploadProgress(long BytesTransferred, long TotalBytes);
 
 public sealed record ModpackSwitchRequest(string ModpackId, string? WorldArchiveId);

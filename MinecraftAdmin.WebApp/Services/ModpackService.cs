@@ -80,6 +80,44 @@ public sealed class ModpackService(
             .ToArray();
     }
 
+    public Task<ModpackDefinition> GetModpackAsync(string modpackId, CancellationToken ct = default) =>
+        ReadModpackAsync(modpackId, ct);
+
+    public async Task<ModpackDefinition> UpdateAsync(
+        string modpackId,
+        ModpackUpdateRequest request,
+        CancellationToken ct = default)
+    {
+        var name = request.Name.Trim();
+        if (name.Length == 0)
+            throw new InvalidOperationException("Enter a modpack name.");
+
+        ParseEnvironment(request.Environment);
+
+        await libraryLock_.WaitAsync(ct);
+        try
+        {
+            var current = await ReadModpackAsync(modpackId, ct);
+            var updated = new ModpackDefinition
+            {
+                Id = current.Id,
+                Name = name,
+                Environment = NormalizeEnvironmentText(request.Environment),
+                ServerPackFile = current.ServerPackFile,
+                OriginalFileName = current.OriginalFileName,
+                UploadedAtUtc = current.UploadedAtUtc,
+                Worlds = current.Worlds
+            };
+
+            await WriteModpackAsync(updated, ct);
+            return updated;
+        }
+        finally
+        {
+            libraryLock_.Release();
+        }
+    }
+
     public async Task<ModpackDefinition> UploadAsync(
         ModpackUploadRequest request,
         Stream serverPack,

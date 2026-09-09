@@ -1,0 +1,63 @@
+.edit-modpack-page {
+    overflow-y: auto;
+}
+
+.page-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.page-heading h1 {
+    margin-top: 0;
+    margin-bottom: .35rem;
+}
+
+.edit-panel {
+    display: grid;
+    gap: .75rem;
+}
+
+.hint {
+    margin: 0;
+    color: #9ca9b6;
+    max-width: 70rem;
+}
+
+label {
+    font-weight: 600;
+}
+
+input,
+textarea {
+    width: 100%;
+    border: 1px solid #3b4856;
+    background: #101419;
+    color: #e9eef4;
+    border-radius: .45rem;
+    padding: .65rem .75rem;
+}
+
+textarea {
+    min-height: 18rem;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    line-height: 1.45;
+}
+
+.pack-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+    color: #cbd5df;
+}
+
+.actions {
+    display: flex;
+    gap: .75rem;
+}
+
+.status-message {
+    margin: .5rem 0;
+}

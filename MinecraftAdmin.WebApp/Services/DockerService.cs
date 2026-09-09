@@ -147,6 +147,57 @@ public sealed class DockerService : IDisposable
             ct);
     }
 
+
+    public async Task<string> GetContainerLogsAsync(
+        int tail = 500,
+        CancellationToken ct = default)
+    {
+        tail = Math.Clamp(tail, 1, 5000);
+
+        using var response = await http_.GetAsync(
+            $"/containers/{Uri.EscapeDataString(options_.ContainerName)}/logs?stdout=true&stderr=true&timestamps=false&tail={tail}",
+            ct);
+
+        await EnsureSuccessAsync(response, "read Minecraft container logs", ct);
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        return DecodeDockerLogStream(bytes);
+    }
+
+    private static string DecodeDockerLogStream(byte[] bytes)
+    {
+        if (bytes.Length < 8 || !LooksLikeMultiplexedHeader(bytes, 0))
+            return Encoding.UTF8.GetString(bytes);
+
+        var output = new StringBuilder();
+        var offset = 0;
+
+        while (offset + 8 <= bytes.Length && LooksLikeMultiplexedHeader(bytes, offset))
+        {
+            var length =
+                (bytes[offset + 4] << 24) |
+                (bytes[offset + 5] << 16) |
+                (bytes[offset + 6] << 8) |
+                bytes[offset + 7];
+
+            offset += 8;
+            if (length < 0 || offset + length > bytes.Length)
+                return Encoding.UTF8.GetString(bytes);
+
+            output.Append(Encoding.UTF8.GetString(bytes, offset, length));
+            offset += length;
+        }
+
+        return output.ToString();
+    }
+
+    private static bool LooksLikeMultiplexedHeader(byte[] bytes, int offset) =>
+        offset + 8 <= bytes.Length &&
+        bytes[offset] is 0 or 1 or 2 &&
+        bytes[offset + 1] == 0 &&
+        bytes[offset + 2] == 0 &&
+        bytes[offset + 3] == 0;
+
     private static JsonObject BuildCreateRequest(
         JsonObject inspection,
         IReadOnlyCollection<string> oldManagedEnvironmentKeys,

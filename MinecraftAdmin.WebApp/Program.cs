@@ -59,6 +59,12 @@ api.MapGet("/modpack", async (ModpackService modpacks, CancellationToken ct) =>
 api.MapGet("/modpacks", async (ModpackService modpacks, CancellationToken ct) =>
     Results.Ok(await modpacks.GetLibraryAsync(ct)));
 
+api.MapPut("/modpacks/{modpackId}", async (string modpackId, ModpackUpdateRequest request, ModpackService modpacks, CancellationToken ct) =>
+    Results.Ok(await modpacks.UpdateAsync(modpackId, request, ct)));
+
+api.MapGet("/server/logs", async (int? tail, DockerService docker, CancellationToken ct) =>
+    Results.Text(await docker.GetContainerLogsAsync(tail ?? 500, ct), "text/plain"));
+
 api.MapPost("/modpacks/upload", UploadModpackAsync)
     .DisableAntiforgery();
 
