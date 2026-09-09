@@ -1,9 +1,10 @@
 @page "/modpacks/upload"
 @rendermode InteractiveServer
+@using System.Diagnostics
 @inject ModpackService ModpackService
 @inject NavigationManager Navigation
 
-<PageTitle>Upload Modpack - Minecraft Admin</PageTitle>
+<PageTitle>Upload Modpack</PageTitle>
 
 <div class="app-page upload-modpack-page">
     <div class="page-heading">
@@ -43,6 +44,25 @@
             </div>
         }
 
+        @if (uploading_)
+        {
+            <div class="upload-progress" aria-live="polite">
+                <div class="progress-heading">
+                    <span>@UploadPercent.ToString("0.0")%</span>
+                    <span>@FormatBytes(uploadTransferred_) / @FormatBytes(uploadTotal_)</span>
+                </div>
+                <div class="progress-track"
+                     role="progressbar"
+                     aria-label="Modpack upload progress"
+                     aria-valuemin="0"
+                     aria-valuemax="100"
+                     aria-valuenow="@UploadPercentAria">
+                    <div class="progress-fill" style="@UploadProgressStyle"></div>
+                </div>
+                <div class="progress-timing">@UploadTimingText</div>
+            </div>
+        }
+
         <button @onclick="UploadAsync" disabled="@(uploading_ || selectedFile_ is null)">
             @if (uploading_)
             {
@@ -74,10 +94,42 @@
     private bool uploading_;
     private string? status_;
     private string? error_;
+    private long uploadTransferred_;
+    private long uploadTotal_;
+    private readonly Stopwatch uploadStopwatch_ = new();
+
+    private double UploadPercent => uploadTotal_ <= 0
+        ? 0
+        : Math.Clamp((double)uploadTransferred_ / uploadTotal_ * 100.0, 0, 100);
+
+    private string UploadPercentAria => UploadPercent.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+    private string UploadProgressStyle => $"width: {UploadPercent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}%;";
+
+    private string UploadTimingText
+    {
+        get
+        {
+            var elapsed = uploadStopwatch_.Elapsed;
+            if (uploadTransferred_ <= 0 || elapsed.TotalSeconds <= 0.1)
+                return $"Elapsed {FormatDuration(elapsed)}";
+
+            var bytesPerSecond = uploadTransferred_ / elapsed.TotalSeconds;
+            if (uploadTransferred_ < uploadTotal_ && bytesPerSecond > 0)
+            {
+                var remaining = TimeSpan.FromSeconds((uploadTotal_ - uploadTransferred_) / bytesPerSecond);
+                return $"Elapsed {FormatDuration(elapsed)} · About {FormatDuration(remaining)} remaining";
+            }
+
+            return $"Uploaded in {FormatDuration(elapsed)}";
+        }
+    }
 
     private void OnFileSelected(InputFileChangeEventArgs args)
     {
         selectedFile_ = args.File;
+        uploadTransferred_ = 0;
+        uploadTotal_ = selectedFile_.Size;
+        uploadStopwatch_.Reset();
         error_ = null;
         status_ = null;
     }
@@ -88,21 +140,29 @@
             return;
 
         uploading_ = true;
+        uploadTransferred_ = 0;
+        uploadTotal_ = selectedFile_.Size;
+        uploadStopwatch_.Restart();
         error_ = null;
-        status_ = "Uploading and validating server pack…";
+        status_ = "Uploading server pack…";
 
         try
         {
+            var progress = new Progress<ModpackUploadProgress>(OnUploadProgress);
             await using var stream = selectedFile_.OpenReadStream(ModpackService.MaxUploadBytes);
-            var modpack = await ModpackService.UploadAsync(
+            await ModpackService.UploadAsync(
                 new ModpackUploadRequest(name_, environment_),
                 stream,
-                selectedFile_.Name);
+                selectedFile_.Name,
+                selectedFile_.Size,
+                progress);
 
+            uploadStopwatch_.Stop();
             Navigation.NavigateTo("/modpacks");
         }
         catch (Exception ex)
         {
+            uploadStopwatch_.Stop();
             error_ = ex.Message;
             status_ = null;
         }
@@ -110,6 +170,17 @@
         {
             uploading_ = false;
         }
+    }
+
+    private void OnUploadProgress(ModpackUploadProgress progress)
+    {
+        uploadTransferred_ = progress.BytesTransferred;
+        uploadTotal_ = progress.TotalBytes;
+
+        if (uploadTotal_ > 0 && uploadTransferred_ >= uploadTotal_)
+            status_ = "Upload complete. Validating and saving modpack…";
+
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void Back() => Navigation.NavigateTo("/modpacks");
@@ -125,5 +196,13 @@
             unit++;
         }
         return $"{value:0.##} {units[unit]}";
+    }
+
+    private static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+            return $"{(int)duration.TotalHours}:{duration.Minutes:00}:{duration.Seconds:00}";
+
+        return $"{(int)duration.TotalMinutes}:{duration.Seconds:00}";
     }
 }

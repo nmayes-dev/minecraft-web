@@ -82,6 +82,8 @@ public sealed class ModpackService(
         ModpackUploadRequest request,
         Stream serverPack,
         string originalFileName,
+        long totalBytes,
+        IProgress<ModpackUploadProgress>? progress = null,
         CancellationToken ct = default)
     {
         var name = request.Name.Trim();
@@ -110,7 +112,7 @@ public sealed class ModpackService(
             try
             {
                 var zipPath = Path.Combine(temporaryDirectory, ServerPackFileName);
-                await SaveUploadAsync(serverPack, zipPath, ct);
+                await SaveUploadAsync(serverPack, zipPath, totalBytes, progress, ct);
                 ValidateZip(zipPath);
 
                 var modpack = new ModpackDefinition
@@ -477,11 +479,23 @@ public sealed class ModpackService(
         File.Move(temporaryPath, path, overwrite: true);
     }
 
-    private async Task SaveUploadAsync(Stream source, string destination, CancellationToken ct)
+    private async Task SaveUploadAsync(
+        Stream source,
+        string destination,
+        long totalBytes,
+        IProgress<ModpackUploadProgress>? progress,
+        CancellationToken ct)
     {
+        if (totalBytes < 0)
+            throw new ArgumentOutOfRangeException(nameof(totalBytes));
+
+        if (totalBytes > managementOptions_.MaxModpackUploadBytes)
+            throw new InvalidOperationException($"The upload exceeds the configured limit of {FormatBytes(managementOptions_.MaxModpackUploadBytes)}.");
+
         await using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 1024, useAsync: true);
         var buffer = new byte[1024 * 1024];
-        long total = 0;
+        long transferred = 0;
+        progress?.Report(new ModpackUploadProgress(0, totalBytes));
 
         while (true)
         {
@@ -489,15 +503,18 @@ public sealed class ModpackService(
             if (read == 0)
                 break;
 
-            total += read;
-            if (total > managementOptions_.MaxModpackUploadBytes)
+            transferred += read;
+            if (transferred > managementOptions_.MaxModpackUploadBytes)
                 throw new InvalidOperationException($"The upload exceeds the configured limit of {FormatBytes(managementOptions_.MaxModpackUploadBytes)}.");
 
             await output.WriteAsync(buffer.AsMemory(0, read), ct);
+            progress?.Report(new ModpackUploadProgress(transferred, totalBytes));
         }
 
-        if (total == 0)
+        if (transferred == 0)
             throw new InvalidOperationException("The uploaded ZIP is empty.");
+
+        progress?.Report(new ModpackUploadProgress(transferred, totalBytes));
     }
 
     private static void ValidateZip(string path)
