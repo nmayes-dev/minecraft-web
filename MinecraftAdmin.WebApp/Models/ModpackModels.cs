@@ -10,6 +10,7 @@ public sealed class ModpackDefinition
     public string ServerPackFile { get; init; } = "server-pack.zip";
     public string OriginalFileName { get; init; } = string.Empty;
     public DateTimeOffset UploadedAtUtc { get; init; }
+    public bool Pin { get; init; } = false;
     public List<ModpackWorldArchive> Worlds { get; init; } = [];
 }
 

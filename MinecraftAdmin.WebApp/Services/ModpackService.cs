@@ -44,6 +44,12 @@ public sealed class ModpackService(
     {
         var modpacks = await GetModpacksAsync(ct);
         var activeId = await ResolveActiveModpackIdAsync(modpacks, ct);
+
+        modpacks = modpacks
+            .OrderByDescending(x => x.Id == activeId)
+            .ThenByDescending(x => x.Pin)
+            .ToList();
+
         return new ModpackLibraryState(modpacks, activeId);
     }
 
