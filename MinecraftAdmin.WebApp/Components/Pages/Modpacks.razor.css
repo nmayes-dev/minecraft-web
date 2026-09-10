@@ -22,34 +22,36 @@
         margin: 0;
     }
 
-    .modpack-panel select {
-        width: 100%;
-    }
-
 .modpack-edit {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 1rem;
-
-}
-    .modpack-edit select {
-        min-width: 0;
-        width: 100%;
-    }
-
-.modpack-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 1rem;
 }
 
-    .modpack-actions button {
-        margin: 1px 0;
+    .modpack-edit button {
+        margin: 1px;
         width: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
     }
+
+.current-pack {
+    font-weight: bold;
+}
+
+.not-current-pack {
+    font-weight: normal;
+}
+
+.modpack-none {
+    color: rgba(233, 238, 244, 0.5);
+}
+
+    .modpack-none option {
+        color: rgba(233, 238, 244, 1);
+    }
+
 
 .hint {
     margin: 0;

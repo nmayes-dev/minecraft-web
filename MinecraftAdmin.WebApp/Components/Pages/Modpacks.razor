@@ -29,18 +29,29 @@
             <label for="modpack">Modpack</label>
 
             <div class="modpack-edit">
-                <select id="modpack" @bind="selectedModpackId_" @bind:after="OnModpackChanged" disabled="@switching_">
-                    @foreach (var modpack in library_.Modpacks)
-                    {
-                        <option value="@modpack.Id" selected="@(modpack.Id == library_.ActiveModpackId)">
-                            @($"{modpack.Name}{(modpack.Id == library_.ActiveModpackId ? " (Current)" : "")}")
-                        </option>
-                    }
-                </select>
-                <div class="modpack-actions">
+                @{
+                    bool noPack = SelectedModpack is null;
+                    var selectClass = noPack ? "modpack-none" : selectedModpackId_ == library_.ActiveModpackId ? "current-pack" : null;
+                    <select id="modpack" class="@selectClass" @bind="selectedModpackId_" @bind:after="OnModpackChanged" disabled="@switching_">
+                        @if (noPack)
+                        {
+                            <option value="" class="modpack-placeholder" disabled hidden>Select a modpack...</option>
+                        }
+                        @foreach (var modpack in library_.Modpacks)
+                        {
+                            bool isCurrentPack = modpack.Id == library_.ActiveModpackId;
+                            <option value="@modpack.Id" class="@(isCurrentPack ? "current-pack" : "not-current-pack")">
+                                @modpack.Name
+                                @if (isCurrentPack)
+                                {
+                                    <text> ✓</text>
+                                }
+
+                            </option>
+                        }
+                    </select>
                     <button class="edit-button" @onclick="OpenEdit" disabled="@(switching_ || SelectedModpack is null)">Edit</button>
-                    <button @onclick="OpenUpload" disabled="@switching_">Upload</button>
-                </div>
+                }
             </div>
 
             @if (SelectedModpack is { } selected)
@@ -59,8 +70,9 @@
             @if (!confirming_)
             {
                 <div class="switch-details">
+                    <button @onclick="OpenUpload" disabled="@switching_">Upload</button>
                     <button class="danger change-button" @onclick="BeginConfirmation" disabled="@(switching_ || SelectedModpack is null)">
-                        Load
+                        Switch
                     </button>
                     @if (!string.IsNullOrWhiteSpace(progressMessage_))
                     {
@@ -117,6 +129,7 @@
             if (SelectedModpack is not { } selected)
                 return string.Empty;
 
+
             var world = selected.Worlds.FirstOrDefault(item => item.Id == selectedWorldId_);
             return world is null
                 ? $"{selected.Name} will be installed with a new world."
@@ -134,9 +147,9 @@
         try
         {
             library_ = await ModpackService.GetLibraryAsync();
-
+            
             if (library_.Modpacks.Count > 0 && !library_.Modpacks.Any(modpack => modpack.Id == selectedModpackId_))
-                selectedModpackId_ = library_.ActiveModpackId ?? library_.Modpacks[0].Id;
+                selectedModpackId_ = library_.ActiveModpackId ?? string.Empty;
 
             selectedWorldId_ = string.Empty;
         }

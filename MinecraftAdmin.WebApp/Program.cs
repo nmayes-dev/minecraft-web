@@ -20,6 +20,11 @@ builder.Services.AddSingleton<MinecraftService>();
 builder.Services.AddSingleton<DockerService>();
 builder.Services.AddSingleton<ModpackService>();
 
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.Name = "MinecraftAdmin.WebApp.Antiforgery";
+});
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
