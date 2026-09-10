@@ -7,13 +7,8 @@
 
 <div class="app-page modpack-page">
     <div class="page-heading">
-        <div>
-            <h1>Modpacks</h1>
-            <p class="hint">Choose an uploaded server pack and either start a new world or restore one previously saved for that pack.</p>
-        </div>
-        <div class="page-heading-upload">
-            <button @onclick="OpenUpload" disabled="@switching_">Upload</button>
-        </div>
+        <h1>Modpacks</h1>
+        <p class="hint">Choose an uploaded server pack and either start a new world or restore one previously saved for that pack.</p>
     </div>
 
     @if (loading_)
@@ -31,37 +26,25 @@
     else
     {
         <section class="panel modpack-panel">
-            <div class="current-pack">
-                <span>Current Modpack</span>
-                <strong>@ActiveModpackName</strong>
-            </div>
-
-            @if (library_.ActiveModpackId is null)
-            {
-                <p class="warning-text">
-                    The current server is not associated with an uploaded modpack. A full backup will still be saved on the first switch,
-                    but a selectable world snapshot can only be attached when the current environment matches an uploaded pack.
-                </p>
-            }
-
             <label for="modpack">Modpack</label>
+
             <div class="modpack-edit">
                 <select id="modpack" @bind="selectedModpackId_" @bind:after="OnModpackChanged" disabled="@switching_">
                     @foreach (var modpack in library_.Modpacks)
                     {
-                        <option value="@modpack.Id">@modpack.Name</option>
+                        <option value="@modpack.Id" selected="@(modpack.Id == library_.ActiveModpackId)">
+                            @($"{modpack.Name}{(modpack.Id == library_.ActiveModpackId ? " (Current)" : "")}")
+                        </option>
                     }
                 </select>
-                <button class="edit-button" @onclick="OpenEdit" disabled="@(switching_ || SelectedModpack is null)">Edit</button>
+                <div class="modpack-actions">
+                    <button class="edit-button" @onclick="OpenEdit" disabled="@(switching_ || SelectedModpack is null)">Edit</button>
+                    <button @onclick="OpenUpload" disabled="@switching_">Upload</button>
+                </div>
             </div>
 
             @if (SelectedModpack is { } selected)
             {
-                <div class="pack-details">
-                    <span><strong>Server pack:</strong> @selected.OriginalFileName</span>
-                    <span><strong>Uploaded:</strong> @selected.UploadedAtUtc.ToLocalTime().ToString("g")</span>
-                </div>
-
                 <label for="world">World</label>
                 <select id="world" @bind="selectedWorldId_" disabled="@switching_">
                     <option value="">Create a new world</option>
@@ -72,26 +55,24 @@
                         </option>
                     }
                 </select>
-
-                @if (selected.Worlds.Count == 0)
-                {
-                    <p class="hint">No previously saved worlds are available for this modpack yet.</p>
-                }
             }
-        </section>
-
-        <section class="panel modpack-panel switch-panel">
-            <h2>Switch Server</h2>
-            <p class="hint">
-                The current server is stopped and fully backed up first. Its current world is also saved against its modpack.
-                The selected server-pack ZIP is then extracted and the chosen world is restored, or a new world is created.
-            </p>
-
             @if (!confirming_)
             {
-                <button class="danger change-button" @onclick="BeginConfirmation" disabled="@(switching_ || SelectedModpack is null)">
-                    Switch
-                </button>
+                <div class="switch-details">
+                    <button class="danger change-button" @onclick="BeginConfirmation" disabled="@(switching_ || SelectedModpack is null)">
+                        Load
+                    </button>
+                    @if (!string.IsNullOrWhiteSpace(progressMessage_))
+                    {
+                        <p class="status-message">
+                            @if (switching_)
+                            {
+                                <span class="spinner" aria-hidden="true"></span>
+                            }
+                            <span>@progressMessage_</span>
+                        </p>
+                    }
+                </div>
             }
             else
             {
@@ -105,17 +86,6 @@
                 </div>
             }
         </section>
-    }
-
-    @if (!string.IsNullOrWhiteSpace(progressMessage_))
-    {
-        <p class="status-message">
-            @if (switching_)
-            {
-                <span class="spinner" aria-hidden="true"></span>
-            }
-            <span>@progressMessage_</span>
-        </p>
     }
 
     @if (!string.IsNullOrWhiteSpace(error_))

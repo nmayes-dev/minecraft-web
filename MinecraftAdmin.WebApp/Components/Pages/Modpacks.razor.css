@@ -2,15 +2,7 @@
     overflow-y: auto;
 }
 
-.page-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
 .page-heading h1 {
-    margin-bottom: .35rem;
     margin-top: 0;
 }
 
@@ -25,15 +17,39 @@
     gap: .75rem;
 }
 
-.modpack-panel h2,
-.empty-panel h2 {
-    margin: 0;
-}
+    .modpack-panel h2,
+    .empty-panel h2 {
+        margin: 0;
+    }
+
+    .modpack-panel select {
+        width: 100%;
+    }
 
 .modpack-edit {
-    display: flex;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+
 }
+    .modpack-edit select {
+        min-width: 0;
+        width: 100%;
+    }
+
+.modpack-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+}
+
+    .modpack-actions button {
+        margin: 1px 0;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
 
 .hint {
     margin: 0;
@@ -43,7 +59,7 @@
 
 .warning-text {
     margin: 0;
-    padding: .75rem;
+    padding: 0.5rem 0.75rem;
     border: 1px solid #6f5c32;
     border-radius: .45rem;
     background: #292315;
@@ -56,9 +72,9 @@
     gap: .55rem;
 }
 
-.current-pack span {
-    color: #9ca9b6;
-}
+    .current-pack span {
+        color: #9ca9b6;
+    }
 
 label {
     font-weight: 600;
@@ -82,7 +98,6 @@ select {
 
 .change-button {
     justify-self: start;
-    margin-top: .25rem;
 }
 
 .confirmation {
@@ -97,14 +112,17 @@ select {
 .confirmation-actions {
     display: flex;
     gap: .65rem;
-    margin-top: .25rem;
+}
+
+.switch-details {
+    display: flex;
+    gap: 1rem;
 }
 
 .status-message {
     display: flex;
     align-items: center;
     gap: .55rem;
-    margin: .25rem 0 0;
 }
 
 .spinner {

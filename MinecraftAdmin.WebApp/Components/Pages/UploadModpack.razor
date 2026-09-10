@@ -98,12 +98,13 @@
                 </button>
             }
         </div>
+
+        @if (!string.IsNullOrWhiteSpace(status_))
+        {
+            <p class="status-message">@status_</p>
+        }
     </section>
 
-    @if (!string.IsNullOrWhiteSpace(status_))
-    {
-        <p class="status-message">@status_</p>
-    }
 
     @if (!string.IsNullOrWhiteSpace(error_))
     {
